@@ -463,6 +463,24 @@ where stations are in the Americas. For 100 kHz steps set **Settings > Talk & li
 Either way you can type any frequency, 90.2 for example. In the air band **Auto** steps 25 kHz; set the VFO step to
 8.33 kHz for the narrow channels.
 
+### Air band channel names
+
+Air band channels on 8.33 kHz spacing are published by a channel name, not their frequency. Type the name: the radio
+keeps it, shows it and saves it in the codeplug as typed, and tunes the channel it stands for.
+
+| Name | The radio tunes |
+|---|---|
+| 118.000 | 118.0000 MHz (a 25 kHz channel) |
+| 118.005 | 118.0000 MHz (the same channel on 8.33 kHz spacing) |
+| 118.010 | 118.0083 MHz |
+| 118.015 | 118.0167 MHz |
+| 118.020 | refused: "No air band channel by that name" |
+
+The pattern repeats every 25 kHz: 118.025, .030, .035 and .040 are channels, 118.045 is not. Type one more digit
+(118.0055) and the radio takes the frequency as typed. With the 8.33 kHz step, the knob and **Up** / **Down** go
+from name to name (118.005, 118.010, 118.015, 118.030). In the Codeplug Editor type the name too; the Problems list
+warns about an air band frequency in whole kHz that names no channel.
+
 ## Channels the radio can't use
 
 Channels outside the radio's bands don't transmit ("Outside ..."). Receive-only channels show "RX only" as the talk

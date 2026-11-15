@@ -2140,6 +2140,7 @@
  "editor.problem.no_name": "名称为空。",
  "editor.problem.bad_freq": "{field} 不是有效的频率。",
  "editor.problem.listen_dmr_air": "接收频率位于航空波段，电台以 AM 接收该波段。请将模式设为 FM。",
+ "editor.problem.air_no_channel": "接收频率不是任何航空信道名称：电台按输入值调谐。每个 25 kHz 段内的信道名称以 00、05、10 或 15 结尾（118.010 即 118.0083 处的信道）。",
  "editor.problem.listen_dmr_bcast": "接收频率位于调频广播波段，只有 FM 信道才会播放该波段。请将模式设为 FM。",
  "editor.problem.out_of_band": "{field} 超出电台的频段范围。",
  "editor.problem.bad_tone": "{field} 不是有效的 CTCSS 或 DCS 亚音。",

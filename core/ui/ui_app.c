@@ -23,6 +23,9 @@
 #include "i18n.h"
 #include "input/input.h"
 #include "radio/tones.h"
+#if CONFIG_AM_RX
+#include "radio/radio_am.h"
+#endif
 #include "config.h"
 #include "codeplug/codeplug_modes.h"	// CODEPLUG_KIND_NONE
 #if CONFIG_HOTSPOT || (CONFIG_USB_NETWORK && CONFIG_HOSTLINK)
@@ -867,13 +870,27 @@ bool ui_freq_entry_digit(char *digits, uint8_t *len, char d)
 	return false;
 }
 
+// Typed up to the kHz digit in the air band, a value is a channel name and is kept as typed (the radio tunes 118.010
+// as 118.008333; airband-and-broadcast.md 3.4); one that names no channel (118.020) is refused. A 100 Hz or 10 Hz
+// digit more is a frequency, kept as typed whatever it is
+static bool entry_no_channel(uint8_t len, uint32_t hz)
+{
+#if CONFIG_AM_RX
+	return len <= UI_ENTRY_MHZ + 3 && radio_am_tx_refused(hz) && radio_am_name_hz(hz / 1000u) == 0;
+#else
+	(void)len;
+	(void)hz;
+	return false;
+#endif
+}
+
 uint32_t ui_freq_parse(const char *digits, uint8_t len)
 {
 	if (len < UI_ENTRY_MHZ || len > UI_ENTRY_MAX)
 		return 0;
 	uint32_t lo, hi;
 	entry_range(digits, len, &lo, &hi);
-	return board_in_band(lo, false) ? lo : 0;
+	return board_in_band(lo, false) && !entry_no_channel(len, lo) ? lo : 0;
 }
 
 uint32_t ui_freq_entry_hz(const char *digits, uint8_t len)
@@ -883,8 +900,11 @@ uint32_t ui_freq_entry_hz(const char *digits, uint8_t len)
 		return 0;
 	}
 	uint32_t hz = ui_freq_parse(digits, len);
-	if (hz == 0)
-		ui_toast(TR(FREQ_TOAST_NOT_IN_BAND, "Not in a band: type more digits"));
+	if (hz == 0) {
+		uint32_t lo, hi;
+		entry_range(digits, len, &lo, &hi);
+		ui_toast(entry_no_channel(len, lo) ? TR(FREQ_TOAST_NO_AIR_CHANNEL, "No air band channel by that name") : TR(FREQ_TOAST_NOT_IN_BAND, "Not in a band: type more digits"));
+	}
 	return hz;
 }
 

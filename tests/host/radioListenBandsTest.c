@@ -316,18 +316,40 @@ static void test_helpers(void)
 	CHECK(radio_am_channel(&ch));
 	ch.mode = RADIO_MODE_DMR;
 	CHECK(!radio_am_channel(&ch));
-	// 8.33 kHz: the exact 25/3 kHz grid, snapping first
-	CHECK(radio_am_step_833(118000000, 1) == 118008333);
-	CHECK(radio_am_step_833(118008333, 1) == 118016667);
-	CHECK(radio_am_step_833(118016667, 1) == 118025000);
-	CHECK(radio_am_step_833(118025000, -1) == 118016667);
-	CHECK(radio_am_step_833(118010000, 1) == 118016667);	// 118.010 snaps to 118.00833 first
-	// Many 8.33 steps don't drift: 30 up lands on 118.250 exactly
+	// Channel names (spec 3.4): x.x00 and x.x05 are the block's first channel, x.x10 +8.333, x.x15 +16.667, x.x20 none
+	CHECK(radio_am_name_hz(118000) == 118000000 && radio_am_name_hz(118005) == 118000000);
+	CHECK(radio_am_name_hz(118010) == 118008333 && radio_am_name_hz(118015) == 118016667);
+	CHECK(radio_am_name_hz(118020) == 0 && radio_am_name_hz(118045) == 0 && radio_am_name_hz(118070) == 0);
+	CHECK(radio_am_name_hz(118095) == 0 && radio_am_name_hz(118012) == 0);
+	CHECK(radio_am_name_hz(118025) == 118025000 && radio_am_name_hz(118030) == 118025000);
+	CHECK(radio_am_name_hz(118035) == 118033333 && radio_am_name_hz(118040) == 118041667);
+	CHECK(radio_am_name_hz(136990) == 136991667);
+	// The receiver tunes a name as its channel and anything else as stored
+	CHECK(radio_am_tune_hz(118010000) == 118008333 && radio_am_tune_hz(118005000) == 118000000);
+	CHECK(radio_am_tune_hz(118100000) == 118100000 && radio_am_tune_hz(132990000) == 132991667);
+	CHECK(radio_am_tune_hz(118005500) == 118005500);	// typed to 100 Hz: a frequency
+	CHECK(radio_am_tune_hz(118008330) == 118008330);	// a codeplug holding the frequency itself
+	CHECK(radio_am_tune_hz(118020000) == 118020000);	// no channel: as stored
+	CHECK(radio_am_tune_hz(107995000) == 107995000 && radio_am_tune_hz(146010000) == 146010000);	// outside the band
+	// 8.33 kHz: channel to channel, landing on the names
+	CHECK(radio_am_step_833(118000000, 1) == 118010000);
+	CHECK(radio_am_step_833(118005000, 1) == 118010000);
+	CHECK(radio_am_step_833(118010000, 1) == 118015000);
+	CHECK(radio_am_step_833(118015000, 1) == 118030000);	// past the x.x20 that names nothing
+	CHECK(radio_am_step_833(118030000, -1) == 118015000);
+	CHECK(radio_am_step_833(118005000, -1) == 117990000);
+	CHECK(radio_am_step_833(118015000, 2) == 118035000);
+	CHECK(radio_am_step_833(118008330, 1) == 118015000);	// the frequency itself, in 10 Hz units
+	CHECK(radio_am_step_833(118008330, -1) == 118005000);
+	CHECK(radio_am_step_833(118005500, 1) == 118010000);	// off the grid: the nearest in dir
+	CHECK(radio_am_step_833(118005500, -1) == 118005000);
+	CHECK(radio_am_step_833(146000000, 1) == 146008333);	// outside the band: the grid frequency
+	// Many 8.33 steps don't drift: 30 up from 118.000 lands on 118.255, the channel at 118.250
 	uint32_t hz = 118000000;
 	for (int i = 0; i < 30; i++) {
 		hz = radio_am_step_833(hz, 1);
 	}
-	CHECK(hz == 118250000);
+	CHECK(hz == 118255000 && radio_am_tune_hz(hz) == 118250000);
 
 	// Broadcast: the receiver's range, FM channels only, TX refused there, its grid, the squelch scale and volume
 	CHECK(radio_bcast_capable());
@@ -375,6 +397,20 @@ static void test_am_channel(void)
 	hw.sig_hz = 0;
 	run(100);
 	CHECK(sm.view.state == RS_IDLE);
+
+	// A channel stored by its name (118.010, as typed) keeps it and is tuned to its frequency (118.008333)
+	chans[1].rx_hz = chans[1].tx_hz = 118010000;
+	req(RREQ_ZONE_POS, 6);
+	run(50);
+	req(RREQ_ZONE_POS, 0);
+	run(50);
+	CHECK(sm.view.am && sm.view.ch.rx_hz == 118010000 && hw.rx_hz == 118008333);
+	chans[1].rx_hz = chans[1].tx_hz = 118100000;
+	req(RREQ_ZONE_POS, 6);
+	run(50);
+	req(RREQ_ZONE_POS, 0);
+	run(50);
+	CHECK(hw.rx_hz == 118100000);
 
 	// Receive only: PTT refused with the AM reason, nothing keyed, even though the codeplug allows TX
 	ptt(true);
@@ -480,14 +516,22 @@ static void test_vfo_steps(void)
 	CHECK(sm.view.vfo_step_hz == RADIO_AM_STEP_833);
 	req(RREQ_VFO_STEP, 1);
 	run(30);
-	CHECK(hw.rx_hz == 118008333 && sm.view.am);
+	// The VFO holds the channel's name, the receiver its frequency
+	CHECK(sm.view.ch.rx_hz == 118010000 && hw.rx_hz == 118008333 && sm.view.am);
 	req(RREQ_VFO_STEP, 2);
 	run(30);
-	CHECK(sm.view.ch.rx_hz == 118025000);
+	CHECK(sm.view.ch.rx_hz == 118030000 && hw.rx_hz == 118025000);
 	req(RREQ_VFO_STEP_SIZE, RADIO_AM_STEP_25K);
 	req(RREQ_VFO_STEP, -1);
 	run(30);
-	CHECK(sm.view.ch.rx_hz == 118000000);
+	CHECK(sm.view.ch.rx_hz == 118005000 && hw.rx_hz == 118000000);
+	// A name set directly (typed on Home) is kept and tuned as its channel; a frequency typed to 100 Hz as typed
+	req(RREQ_VFO_SET, 118015000);
+	run(30);
+	CHECK(sm.view.ch.rx_hz == 118015000 && hw.rx_hz == 118016667);
+	req(RREQ_VFO_SET, 118005500);
+	run(30);
+	CHECK(sm.view.ch.rx_hz == 118005500 && hw.rx_hz == 118005500);
 	// The step is kept in the settings
 	settings_t st;
 	settings_read(&st);

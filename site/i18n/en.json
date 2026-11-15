@@ -2140,6 +2140,7 @@
  "editor.problem.no_name": "The name is empty.",
  "editor.problem.bad_freq": "The {field} is not a valid frequency.",
  "editor.problem.listen_dmr_air": "The RX frequency is in the air band, which radios receive in AM. Set the mode to FM.",
+ "editor.problem.air_no_channel": "The RX frequency names no air band channel: radios tune it as typed. Channel names end in 00, 05, 10 or 15 within each 25 kHz block (118.010 is the channel at 118.0083).",
  "editor.problem.listen_dmr_bcast": "The RX frequency is in the broadcast FM band, which only an FM channel plays. Set the mode to FM.",
  "editor.problem.out_of_band": "The {field} is outside the radio's bands.",
  "editor.problem.bad_tone": "The {field} is not a valid CTCSS or DCS tone.",
