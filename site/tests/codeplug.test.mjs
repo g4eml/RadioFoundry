@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { CodeplugImage, CODEPLUG_SPAN } from "../static/js/codeplug/image.js";
-import { decode, encode, empty, remove, validate, newChannel, newContact, refNumber, listenBand } from "../static/js/codeplug/model.js";
+import { decode, encode, empty, remove, validate, newChannel, newContact, refNumber, listenBand, airNoChannel } from "../static/js/codeplug/model.js";
 import { getTone, putTone, parseTone, parseFreq, mhz, getCoord, coordBytes } from "../static/js/codeplug/fields.js";
 import * as iddb from "../static/js/codeplug/iddb.js";
 import { blankChannel, decodeChannel, encodeChannel } from "../static/js/codeplug/records.js";
@@ -224,6 +224,16 @@ test("the air band and broadcast FM are receive only: a TX frequency there witho
 	m.channels.push(ch("c0", 118100000, "fm", true), ch("c1", 98500000, "fm", false), ch("c2", 121500000, "dmr", true), ch("c3", 146520000, "fm", false));
 	const warned = validate(m).filter((p) => p.code.startsWith("listen_")).map((p) => [p.item.name, p.code]);
 	assert.deepEqual(warned, [["c1", "listen_tx_bcast"], ["c2", "listen_dmr_air"]]);
+});
+
+test("an air band frequency in whole kHz is a channel name: one that names no channel is warned, a typed frequency isn't", () => {
+	assert.deepEqual([118000000, 118005000, 118010000, 118015000, 118020000, 118012000, 118045000, 118005500, 118008330, 146020000].map(airNoChannel),
+		[false, false, false, false, true, true, true, false, false, false]);
+	const m = empty();
+	m.channels.push(newChannel({ name: "a", rxHz: 118010000, txHz: 118010000, mode: "fm", rxOnly: true }),
+		newChannel({ name: "b", rxHz: 118020000, txHz: 118020000, mode: "fm", rxOnly: true }));
+	const warned = validate(m).filter((p) => p.code === "air_no_channel").map((p) => p.item.name);
+	assert.deepEqual(warned, ["b"]);
 });
 
 test("the DMR ID database is found by the radio across both areas", () => {

@@ -759,7 +759,8 @@ static void tune(radio_sm_t *sm, uint32_t now_ms)
 		board.radio->set_mode(board_mode);
 	}
 #if CONFIG_AM_RX
-	if (sm->view.am && !board.radio->rx_am(sm->view.ch.rx_hz, (radio_bw_t)sm->view.ch.bw)) {
+	// A channel name (118.010) is tuned as its channel (118.008333); the view and the codeplug keep the name
+	if (sm->view.am && !board.radio->rx_am(radio_am_tune_hz(sm->view.ch.rx_hz), (radio_bw_t)sm->view.ch.bw)) {
 		sm->view.am = false;	// the board refused: FM as before (TX stays refused in the air band)
 	}
 #endif
@@ -1052,7 +1053,7 @@ static void vfo_step(radio_sm_t *sm, int dir, uint32_t now_ms)
 {
 	step_update(sm);
 #if CONFIG_AM_RX
-	int64_t hz = radio_am_step(sm->view.ch.rx_hz, dir, sm->view.vfo_step_hz);	// the 8.33 kHz grid kept exact
+	int64_t hz = radio_am_step(sm->view.ch.rx_hz, dir, sm->view.vfo_step_hz);	// 8.33 kHz: channel to channel
 #else
 	int64_t hz = (int64_t)sm->view.ch.rx_hz + (int64_t)dir * sm->view.vfo_step_hz;
 #endif

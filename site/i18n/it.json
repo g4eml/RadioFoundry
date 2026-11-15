@@ -1996,6 +1996,7 @@
  "editor.problem.no_name": "Il nome è vuoto.",
  "editor.problem.bad_freq": "Il campo {field} non è una frequenza valida.",
  "editor.problem.listen_dmr_air": "La frequenza RX è nella banda aerea, che le radio ricevono in AM. Imposta il modo su FM.",
+ "editor.problem.air_no_channel": "La frequenza RX non indica alcun canale aereo: le radio la sintonizzano così com'è. I nomi dei canali finiscono in 00, 05, 10 o 15 in ogni blocco di 25 kHz (118.010 è il canale a 118.0083).",
  "editor.problem.listen_dmr_bcast": "La frequenza RX è nella banda FM broadcast, che solo un canale FM riproduce. Imposta il modo su FM.",
  "editor.problem.listen_tx_air": "La frequenza TX è nella banda aerea, dove le radio ricevono soltanto. Attiva Solo RX.",
  "editor.problem.listen_tx_bcast": "La frequenza TX è nella banda FM broadcast, dove le radio ricevono soltanto. Attiva Solo RX.",

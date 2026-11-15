@@ -294,6 +294,15 @@ export function listenBand(hz) {
 	return null;
 }
 
+// An air band frequency in whole kHz is a channel name as the radio reads it (airband-and-broadcast.md 3.4): x.x00 and
+// x.x05 are a 25 kHz block's first channel, x.x10 and x.x15 its 8.33 kHz ones, tuned at +8.333 and +16.667 kHz. True
+// when hz names no channel (118.020, 118.012); the radio tunes that as stored
+export function airNoChannel(hz) {
+	if (listenBand(hz) !== "air" || hz % 1000 !== 0) return false;
+	const sub = (hz / 1000) % 25;
+	return sub % 5 !== 0 || sub === 20;
+}
+
 // --- Validation ---
 
 // Problems as {level: "error" | "warning", table, item, field, code, params}; the page words them
@@ -329,6 +338,7 @@ export function validate(m, { bands = null, features = null } = {}) {
 		if (c.mode === "dmr" && !c.kind && !c.contact && !c.rxOnly) warn("channels", c, "contact", "no_contact");
 		const band = listenBand(c.rxHz);
 		if (band && c.mode === "dmr") warn("channels", c, "mode", `listen_dmr_${band}`);
+		if (airNoChannel(c.rxHz)) warn("channels", c, "rxHz", "air_no_channel");
 		const txBand = listenBand(c.txHz);
 		if (txBand && !c.rxOnly) warn("channels", c, "rxOnly", `listen_tx_${txBand}`);
 		for (const k of REFS) if (typeof c[k] === "number") warn("channels", c, k, "dangling", { number: c[k] });

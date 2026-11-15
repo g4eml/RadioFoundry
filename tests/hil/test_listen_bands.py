@@ -36,6 +36,19 @@ def test_air_band_am(radio):
         assert v.get("mode") == "fm", v
 
 
+@pytest.mark.feature("am_rx")
+def test_air_band_channel_name(radio):
+    # 8.33 kHz channel names (spec 3.4): the VFO keeps the name, the receiver tunes its channel
+    need_vfo(radio, "AM_RX")
+    with radio.vfo_session():
+        v = tune(radio, 118010000)
+        if "am_hz" not in v:
+            skip("not_built", "older firmware: no am_hz key")
+        assert v.get("am") == "1" and v.get("am_hz") == "118008333", v
+        v = tune(radio, 118005500)  # typed to 100 Hz: a frequency, tuned as typed
+        assert v.get("am_hz") == "118005500", v
+
+
 @pytest.mark.feature("bcast_fm")
 def test_broadcast_receiver(radio):
     need_vfo(radio, "BCAST_FM")

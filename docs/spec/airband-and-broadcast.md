@@ -53,7 +53,7 @@ radio uses, and the Problems list warns about a DMR channel there or a TX freque
 | Transmit | refused with `TXDENY_AM` whenever `view.am`, and for any TX frequency in the air band on an AM radio (split channels, DMR channels, the VFO, the data service, the hotspot's frequencies) |
 | Squelch | in AM the board's `status()` gives `noise` on the FM noise scale (larger = weaker) from the reading that tells a carrier from an empty channel in AM, so the levels and hysteresis are the FM ones (3.3). `view.noise` holds that value in AM. Scan uses the same value |
 | Sub-audio | ignored in AM (`tone_needed()` is false, the tone counts as heard) |
-| Steps | `radio_req_vfo_step_size()` (RREQ_VFO_STEP_SIZE, stored in `settings_t.vfo_step_hz`; 0 is auto, the default: 25 kHz at width 25K or in AM, else `RADIO_VFO_STEP_HZ`, recomputed on every view change, with `view.vfo_step_auto` set; Settings › Talk › VFO step); 8333 means the exact 8.33 kHz grid (n x 25/3 kHz, `radio_am_step()` snaps and steps without drift); 25 kHz is a plain step |
+| Steps | `radio_req_vfo_step_size()` (RREQ_VFO_STEP_SIZE, stored in `settings_t.vfo_step_hz`; 0 is auto, the default: 25 kHz at width 25K or in AM, else `RADIO_VFO_STEP_HZ`, recomputed on every view change, with `view.vfo_step_auto` set; Settings › Talk › VFO step); 8333 means the 8.33 kHz channels: `radio_am_step()` moves to the next channel in the direction (n x 25/3 kHz, no drift) and in the air band lands on its name (3.4); 25 kHz is a plain step, so a name stays a name |
 | Band table | the board lists the air band as an RX-only band ({108000000, 136000000, false} after the VHF TX band) |
 | Saving | the channel editor makes a copy whose RX lands in an RX-only band of the table (New from current, a typed RX) RX only, and FM in a listen band (the air band on a radio with AM receive, the broadcast receiver's range), so it saves as is; a DMR copy in a listen band is refused ("Receive only band: set FM"). In another receive-only band a DMR copy stays DMR, RX only ([ui.md](ui.md) 2.1). The codeplug stores a listen band's channel as an FM channel |
 | Mode tile | DMR is refused: "AM only in the air band" |
@@ -88,6 +88,31 @@ Why the squelch stays on noise_sq: the chip's own squelch (programming guide, sq
 noise_sq tells them apart: on the bench it read 59 to 72 on empty channels and fell as a carrier rose (about 61, 53,
 45 and 31 for carriers 5 dB apart, 14 to 19 for a strong one). Level 1 opens where the chip's own squelch does
 (under 0x4F's noise_sq_th_in).
+
+### 3.4 Channel names
+
+With 8.33 kHz spacing an air band channel is published by a name that looks like a frequency but isn't one. Each
+25 kHz block holds four names:
+
+| Name ends in (kHz, within the block) | Channel | Example |
+|---|---|---|
+| 00 | the 25 kHz channel at the block's start | 118.000 → 118.000000 |
+| 05 | the same frequency as an 8.33 kHz channel | 118.005 → 118.000000 |
+| 10 | +8.333 kHz | 118.010 → 118.008333 |
+| 15 | +16.667 kHz | 118.015 → 118.016667 |
+| 20 | no channel | 118.020 |
+
+| Item | Behavior |
+|---|---|
+| Stored | the name as typed: the codeplug, the VFO, `view.ch.rx_hz` and every screen hold 118.010. Nothing is converted on entry or on display |
+| Tuned | `tune()` passes `radio_am_tune_hz(rx_hz)` to `rx_am()`: in the air band a whole 5 kHz value that is a name becomes its channel (`radio_am_name_hz()`); anything else is tuned as stored. Debug link `am_hz` shows the result |
+| Entry | `ui_freq_parse()`: typed up to the kHz digit (6 digits or fewer) in the air band of a radio that receives AM, a value is a name, kept as typed; one that names no channel is refused ("No air band channel by that name"). A 100 Hz or 10 Hz digit more is a frequency, kept as typed whatever it is (118.0055) |
+| Steps | the 8.33 kHz step moves name to name (3.2) |
+| Codeplug Editor | stores what is typed. `airNoChannel()` in `site/static/js/codeplug/model.js`: the Problems list warns about an air band RX frequency in whole kHz that names no channel |
+
+The codeplug has no flag for "a name", so a frequency typed to 100 Hz that lands on a whole 5 kHz name (118.0100) is
+stored as the name and tuned as its channel. Such a frequency is no air band channel. A codeplug holding the channel's
+own frequency (118.00833) is tuned as stored, as before.
 
 ## 4. Broadcast FM
 
@@ -167,7 +192,8 @@ The board must also set the capability bits; without them the code does nothing 
 
 | Test | Covers |
 |---|---|
-| `tests/host/radioListenBandsTest.c` | AM and broadcast channels and VFO, TX refusal, squelch, the steps, a dead receiver |
+| `tests/host/radioListenBandsTest.c` | AM and broadcast channels and VFO, TX refusal, squelch, the steps, channel names (3.4) tuned as their channel, a dead receiver |
 | `tests/host/fd6818Test.c` | the AF output word for AM and back to FM |
-| `tests/host/uiFlowTest.c` | the FM broadcast step row on a radio with the receiver; AM in dual watch (a VFO and a channel pane, the signal line) |
-| `tests/hil/test_listen_bands.py` | the VFO at 118.0 MHz gives `am=1`; at 100.1 MHz `bcast=1` and `bcast_fault=0`. Nothing keys |
+| `tests/host/uiFlowTest.c` | the FM broadcast step row on a radio with the receiver; AM in dual watch (a VFO and a channel pane, the signal line); air band names typed on Home (kept, refused, a 100 Hz frequency) |
+| `site/tests/codeplug.test.mjs` | the Codeplug Editor's warning for a name that is no channel |
+| `tests/hil/test_listen_bands.py` | the VFO at 118.0 MHz gives `am=1`; at 118.010 `am_hz=118008333` and at 118.0055 `am_hz=118005500`; at 100.1 MHz `bcast=1` and `bcast_fault=0`. Nothing keys |

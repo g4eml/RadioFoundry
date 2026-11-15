@@ -220,6 +220,11 @@ msgid "Type at least the MHz digits"
 msgstr "至少输入 MHz 数字"
 
 #: core/ui/ui_app.c
+msgctxt "FREQ_TOAST_NO_AIR_CHANNEL"
+msgid "No air band channel by that name"
+msgstr "无此名称的航空信道"
+
+#: core/ui/ui_app.c
 msgctxt "FREQ_TOAST_NOT_IN_BAND"
 msgid "Not in a band: type more digits"
 msgstr "不在频段内：请继续输入"

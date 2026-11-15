@@ -14,6 +14,9 @@
 #include "codeplug/zone_edit.h"
 #include "settings/settings.h"
 #include "radio/ref_trim.h"
+#if CONFIG_AM_RX
+#include "radio/radio_am.h"
+#endif
 #include "radio/tx_limit.h"
 #include "radio/pa_keyup.h"
 #include "storage/storage.h"
@@ -98,6 +101,10 @@ static void core_section(const radio_view_t *v, dl_text_t *t)
 	}
 	dl_text(t, "mode=%s\n", mode_key(v->ch.mode));
 	dl_text(t, "am=%u\nbcast=%u\nbcast_fault=%u\nbcast_khz=%u\n", v->am, v->bcast, v->bcast_fault, (unsigned)v->bcast_khz);
+#if CONFIG_AM_RX
+	// The receiver's frequency in AM: a channel name (rx_hz 118010000) is tuned as its channel (118008333)
+	dl_text(t, "am_hz=%u\n", v->am ? (unsigned)radio_am_tune_hz(v->ch.rx_hz) : 0u);
+#endif
 	dl_text(t, "vfo=%u\nvfo_index=%u\n", v->vfo, v->vfo_index);
 	dl_text(t, "zone_index=%u\nzone_pos=%u\nzone_size=%u\nzone_count=%u\n", v->zone_index, v->zone_pos, v->zone_size,
 		(unsigned)codeplug_zone_count());

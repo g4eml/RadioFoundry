@@ -29,8 +29,31 @@ bool radio_am_capable(void);
 bool radio_am_channel(const channel_t *ch);
 // Transmitting on hz is refused because it is in the air band of a radio that receives AM there
 bool radio_am_tx_refused(uint32_t hz);
-// One VFO step from hz in dir with step_hz. The 8.33 kHz step moves on the exact 25/3 kHz grid (rounded to the Hz,
-// snapping an off-grid frequency to the nearest grid point first); other steps add step_hz
+// One VFO step from hz in dir with step_hz. The 8.33 kHz step moves to the next 8.33 kHz channel in dir (the exact
+// 25/3 kHz grid); in the air band it lands on that channel's name (118.005, 118.010, 118.015, 118.030), elsewhere on
+// the grid frequency rounded to the Hz. A name is read as its channel first, and a frequency off the grid steps to the
+// nearest channel in dir. Other steps add step_hz, so 25 kHz takes 118.010 to 118.035
 uint32_t radio_am_step(uint32_t hz, int dir, uint32_t step_hz);
+
+// Air band channel names (docs/spec/airband-and-broadcast.md 3.4). With 8.33 kHz spacing a channel is known by a name
+// that looks like a frequency but isn't one: each 25 kHz block holds the names ending in 0 kHz (the 25 kHz channel), 5,
+// 10 and 15 kHz (the three 8.33 kHz channels, at +0, +8.333 and +16.667 kHz); a name ending in 20 kHz is no channel.
+// The codeplug and the VFO keep the name as typed (118.010); only the receiver is tuned to the channel (118.008333)
+
+// The frequency of the channel named name_khz (118010 for 118.010), 0 when the name is no channel. Any kHz value maps;
+// the caller decides it is in the air band. Inline and pure so the UI's entry checks a name without the radio core
+static inline uint32_t radio_am_name_hz(uint32_t name_khz)
+{
+	uint32_t sub = name_khz % 25u;
+	if (sub % 5u != 0 || sub == 20u) {
+		return 0;
+	}
+	uint32_t n = (name_khz - sub) / 25u * 3u + (sub <= 5u ? 0u : sub / 5u - 1u);
+	return (uint32_t)(((uint64_t)n * 25000u + 1u) / 3u);
+}
+
+// The frequency the receiver tunes for hz: in the air band a whole 5 kHz value that is a channel name is that channel
+// (118.010 is 118.008333, 118.005 is 118.000); anything else is tuned as stored (118.0055, 118.00833, 118.020)
+uint32_t radio_am_tune_hz(uint32_t hz);
 
 #endif
