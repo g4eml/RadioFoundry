@@ -49,7 +49,7 @@ uint8_t ui_svc_zone_send(uint16_t zone, uint16_t pos, bool one, uint32_t dst, bo
 		if (one && pos >= z.count)
 			return 0;
 		if (one)
-			num = z.channels[pos];
+			num = zone_channel(&z, pos);
 	}
 	if (total != NULL)
 		*total = one ? 1 : (uint8_t)z.count;

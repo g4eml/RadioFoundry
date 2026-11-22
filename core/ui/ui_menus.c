@@ -1516,7 +1516,7 @@ static bool zone_raw_label(uint16_t raw, char *buf, uint8_t len)
 	}
 #endif
 	uint16_t pos = (uint16_t)(raw - ZE_ADD);
-	if (pos >= z->count || !codeplug_channel_name(z->channels[pos], name))
+	if (pos >= z->count || !codeplug_channel_name(zone_channel(z, pos), name))
 		return false;
 	sb_u32(&b, pos + 1u, 1);
 	sb_chr(&b, ' ');
@@ -1533,7 +1533,7 @@ static void zone_focus(uint16_t num)
 		uint16_t pos = (uint16_t)(ui_filter_raw(i) - ZE_ADD);
 		if (pos >= z->count)
 			continue;
-		if (num != 0 ? z->channels[pos] == num : !v->vfo && v->zone_index == ui_frame()->arg && pos == v->zone_pos)
+		if (num != 0 ? zone_channel(z, pos) == num : !v->vfo && v->zone_index == ui_frame()->arg && pos == v->zone_pos)
 			ui_frame()->focus = i;
 	}
 }
@@ -1583,7 +1583,7 @@ static void zone_item(uint16_t i, ui_item_t *it)
 	}
 #endif
 	raw = (uint16_t)(raw - ZE_ADD);		// the position in the zone
-	if (raw >= z->count || !codeplug_channel(z->channels[raw], &ch))
+	if (raw >= z->count || !codeplug_channel(zone_channel(z, raw), &ch))
 		return;
 	sbuf_t b;
 	sb_init(&b, it->label, sizeof it->label);
@@ -1591,7 +1591,7 @@ static void zone_item(uint16_t i, ui_item_t *it)
 	sb_chr(&b, ' ');
 	sb_str(&b, ch.name);
 	sb_init(&b, it->value, sizeof it->value);
-	if (!sb_channel_row(&b, z->channels[raw], &ch))
+	if (!sb_channel_row(&b, zone_channel(z, raw), &ch))
 		it->flags |= UI_ITEM_DIM;	// a trunked channel whose system isn't set up: locked out
 	const radio_view_t *v = ui_view();
 	if (!v->vfo && v->zone_index == ui_frame()->arg && v->zone_pos == raw)
@@ -1628,7 +1628,7 @@ static void zone_select(uint16_t i, bool hold)
 	(void)hold;
 	const zone_t *z = zone_of_frame();
 	uint16_t pos = (uint16_t)(raw - ZE_ADD);
-	if (pos < z->count && ch_locked(z->channels[pos]))
+	if (pos < z->count && ch_locked(zone_channel(z, pos)))
 		return;
 	if (v->vfo)
 		radio_req_vfo(false);
@@ -2452,7 +2452,7 @@ static uint16_t chlist_current(void)
 	const radio_view_t *v = ui_view();
 	if (v->vfo || !codeplug_zone(v->zone_index, &z) || v->zone_pos >= z.count)
 		return 0;
-	return z.channels[v->zone_pos];
+	return zone_channel(&z, v->zone_pos);
 }
 
 static uint16_t chlist_raw_count(void)
@@ -2565,7 +2565,7 @@ static bool chlist_tune(uint16_t num)
 		if ((k == 0 && v->vfo) || (k > 0 && zi == v->zone_index && !v->vfo) || !codeplug_zone(zi, &z))
 			continue;
 		for (uint16_t pos = 0; pos < z.count; pos++) {
-			if (z.channels[pos] != num)
+			if (zone_channel(&z, pos) != num)
 				continue;
 			if (v->vfo)
 				radio_req_vfo(false);
@@ -3034,7 +3034,7 @@ static void sb_chinfo_zones(sbuf_t *b, uint16_t num)
 		if (!codeplug_zone(zi, &chz_z))
 			continue;
 		for (uint16_t pos = 0; pos < chz_z.count; pos++) {
-			if (chz_z.channels[pos] != num)
+			if (zone_channel(&chz_z, pos) != num)
 				continue;
 			if (found++)
 				sb_str(&ab, ", ");
@@ -4178,7 +4178,7 @@ static void zchan_enter(void)
 	ze_read();
 	uint16_t pos = ui_frame()->arg;
 	zc_name[0] = 0;
-	if (pos < ze_z.count && codeplug_channel(ze_z.channels[pos], &ch))
+	if (pos < ze_z.count && codeplug_channel(zone_channel(&ze_z, pos), &ch))
 		strcpy(zc_name, ch.name);
 }
 
@@ -4210,7 +4210,7 @@ static void zchan_select(uint16_t i, bool hold)
 	uint16_t pos = ui_frame()->arg;
 	if (pos >= ze_z.count)
 		return;
-	uint16_t num = ze_z.channels[pos];
+	uint16_t num = zone_channel(&ze_z, pos);
 	if (i == ZC_UP || i == ZC_DOWN) {
 		int dir = i == ZC_UP ? -1 : 1;
 		if (zone_list_move(&ze_z, pos, dir) != ZONE_EDIT_OK) {
@@ -4527,7 +4527,7 @@ void ui_menus_codeplug(void)
 	ui_frame_t *f = ui_frame();
 	if (f->scr != SCR_ZCHANNEL && f->scr != SCR_ZPICK && f->scr != SCR_ZONEEDIT && f->scr != SCR_ZONEDEL)
 		return;
-	uint16_t num = f->scr == SCR_ZCHANNEL && f->arg < ze_z.count ? ze_z.channels[f->arg] : 0;
+	uint16_t num = f->scr == SCR_ZCHANNEL && f->arg < ze_z.count ? zone_channel(&ze_z, f->arg) : 0;
 	ze_read();
 	if (f->scr == SCR_ZCHANNEL) {
 		int at = zone_list_find(&ze_z, num);

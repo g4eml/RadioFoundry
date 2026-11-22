@@ -79,6 +79,13 @@ typedef struct {
 	uint16_t channels[CODEPLUG_ZONE_MAX];	// codeplug channel numbers, 1-based
 } zone_t;
 
+// The channel number at position pos (0-based) of z, 0 past its end. Code that reads a zone's channels does it through
+// this, never channels[] directly, so a zone whose list isn't held in channels[] reads the same way
+static inline uint16_t zone_channel(const zone_t *z, uint16_t pos)
+{
+	return pos < z->count ? z->channels[pos] : 0;
+}
+
 typedef enum { CODEPLUG_NONE, CODEPLUG_BUILTIN, CODEPLUG_OPENFW } codeplug_source_t;
 
 // Find and check the stored codeplug. Call once the board's flash works

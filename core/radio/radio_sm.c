@@ -1173,7 +1173,7 @@ static bool find_channel(const zone_t *z, int start, int dir, uint16_t *pos, cha
 	int n = z->count;
 	for (int i = 0; i < n; i++) {
 		int p = ((start + dir * i) % n + n) % n;
-		if (channel_read(z->channels[p], ch)) {
+		if (channel_read(zone_channel(z, p), ch)) {
 			*pos = (uint16_t)p;
 			return true;
 		}
@@ -1221,13 +1221,13 @@ static void set_channel(radio_sm_t *sm, uint16_t pos, const channel_t *ch)
 #if CONFIG_DMR_TRUNK
 	// A trunked channel starts its system; any other leaves it. Another channel of the system running keeps the
 	// engine where it is (a payload channel, another TSCC), not on the record's frequencies
-	bool kept = t3_channel(sm, sm->zone.channels[pos], ch);
+	bool kept = t3_channel(sm, zone_channel(&sm->zone, pos), ch);
 	uint32_t rx_hz = sm->view.ch.rx_hz, tx_hz = sm->view.ch.tx_hz;
 	uint8_t cc = sm->view.ch.color_code, ts = sm->view.ch.timeslot;
 #endif
 	sm->view.vfo = false;
 	sm->view.zone_pos = pos;
-	sm->view.channel_number = sm->zone.channels[pos];
+	sm->view.channel_number = zone_channel(&sm->zone, pos);
 	load_channel(sm, ch);
 #if CONFIG_DMR_TRUNK
 	if (kept) {
@@ -4617,8 +4617,8 @@ static bool scan_usable(uint16_t pos, void *ctx)
 {
 	const radio_sm_t *sm = ctx;
 	channel_t ch;
-	return pos < sm->zone.count && channel_read(sm->zone.channels[pos], &ch) && !ch.scan_skip &&
-	       scan_listens(&ch, sm->zone.channels[pos]);
+	return pos < sm->zone.count && channel_read(zone_channel(&sm->zone, pos), &ch) && !ch.scan_skip &&
+	       scan_listens(&ch, zone_channel(&sm->zone, pos));
 }
 
 // Dual watch (SCAN_DUAL): the receiver alternates between two channels, dual[0] and dual[1], skip flags ignored. With
@@ -4680,8 +4680,8 @@ static const zone_t *dual_read(const radio_sm_t *sm, const radio_dual_ref_t *r, 
 #else
 	(void)buf;
 #endif
-	return z != NULL && r->pos < z->count && channel_read(z->channels[r->pos], ch) &&
-	       scan_listens(ch, z->channels[r->pos]) ? z : NULL;
+	return z != NULL && r->pos < z->count && channel_read(zone_channel(z, r->pos), ch) &&
+	       scan_listens(ch, zone_channel(z, r->pos)) ? z : NULL;
 }
 
 static bool dual_ok(const radio_sm_t *sm, const radio_dual_ref_t *r)
@@ -4933,7 +4933,7 @@ static void scan_stop(radio_sm_t *sm, bool cancel, uint32_t now_ms)
 			}
 		} else if (sm->view.zone_pos != sc->origin_pos) {
 			channel_t ch;
-			if (channel_read(sm->zone.channels[sc->origin_pos], &ch)) {
+			if (channel_read(zone_channel(&sm->zone, sc->origin_pos), &ch)) {
 				set_channel(sm, sc->origin_pos, &ch);
 				tune(sm, now_ms);
 			}
@@ -4955,7 +4955,7 @@ static void scan_stop(radio_sm_t *sm, bool cancel, uint32_t now_ms)
 static bool scan_tune_pos(radio_sm_t *sm, uint16_t pos, uint32_t now_ms)
 {
 	channel_t ch;
-	if (pos >= sm->zone.count || !channel_read(sm->zone.channels[pos], &ch)) {
+	if (pos >= sm->zone.count || !channel_read(zone_channel(&sm->zone, pos), &ch)) {
 		return false;
 	}
 	set_channel(sm, pos, &ch);
@@ -4970,8 +4970,8 @@ static int scan_twin_pos(const radio_sm_t *sm, uint16_t fm, uint16_t from)
 {
 	for (uint16_t pos = from; pos < sm->zone.count; pos++) {
 		channel_t ch;
-		if (pos == fm || scan_pos_skipped(&sm->scan, pos) || !channel_read(sm->zone.channels[pos], &ch) ||
-		    ch.scan_skip || ch.rx_hz != sm->view.ch.rx_hz || !scan_listens(&ch, sm->zone.channels[pos])) {
+		if (pos == fm || scan_pos_skipped(&sm->scan, pos) || !channel_read(zone_channel(&sm->zone, pos), &ch) ||
+		    ch.scan_skip || ch.rx_hz != sm->view.ch.rx_hz || !scan_listens(&ch, zone_channel(&sm->zone, pos))) {
 			continue;
 		}
 		if ((CONFIG_DMR && ch.mode == RADIO_MODE_DMR) || air_mode(ch.mode)) {
@@ -5049,7 +5049,7 @@ static bool scan_step(radio_sm_t *sm, uint32_t now_ms)
 	} else {
 		int pos = scan_next_pos(sc, sm->zone.count, scan_usable, sm);
 		channel_t ch;
-		if (pos < 0 || !channel_read(sm->zone.channels[pos], &ch)) {
+		if (pos < 0 || !channel_read(zone_channel(&sm->zone, pos), &ch)) {
 			scan_stop(sm, false, now_ms);
 			return false;
 		}
@@ -5612,7 +5612,7 @@ static void roam_rebuild(radio_sm_t *sm, uint32_t now_ms, bool user)
 	for (uint16_t p = 0; p < sm->zone.count; p++) {
 		uint32_t id;
 		bool priv;
-		if (!channel_read(sm->zone.channels[p], &ch)) {
+		if (!channel_read(zone_channel(&sm->zone, p), &ch)) {
 			continue;
 		}
 		any_flag |= ch.roam;
@@ -5625,7 +5625,7 @@ static void roam_rebuild(radio_sm_t *sm, uint32_t now_ms, bool user)
 		}
 		memset(&sites[n], 0, sizeof(sites[n]));
 		sites[n].pos = p;
-		sites[n].number = sm->zone.channels[p];
+		sites[n].number = zone_channel(&sm->zone, p);
 		flagged[n] = ch.roam;
 		n++;
 	}
@@ -5690,7 +5690,7 @@ static bool roam_tune(radio_sm_t *sm, uint8_t idx, bool force, uint32_t now_ms)
 {
 	const roam_site_t *s = &sm->roam.site[idx];
 	channel_t ch;
-	if (idx >= sm->roam.count || s->pos >= sm->zone.count || sm->zone.channels[s->pos] != s->number ||
+	if (idx >= sm->roam.count || s->pos >= sm->zone.count || zone_channel(&sm->zone, s->pos) != s->number ||
 	    !channel_read(s->number, &ch)) {
 		return false;
 	}
@@ -7804,7 +7804,7 @@ static void persist_vfo(const radio_sm_t *sm, settings_t *st, uint8_t idx)
 static int zone_find(const zone_t *z, uint16_t number)
 {
 	for (uint16_t i = 0; number != 0 && i < z->count; i++) {
-		if (z->channels[i] == number) {
+		if (zone_channel(z, i) == number) {
 			return i;
 		}
 	}
@@ -7882,7 +7882,7 @@ static void persist(radio_sm_t *sm, uint32_t now_ms)
 	if (z != NULL && !ZONES_MOVED(sm)) {
 		st->zone_index = zone;
 		st->zone_pos = pos;
-		st->channel = pos < z->count ? z->channels[pos] : 0;
+		st->channel = pos < z->count ? zone_channel(z, pos) : 0;
 	}
 	persist_vfo(sm, st, sm->vfo_idx);
 	if (sm->squelch_save) {
@@ -8181,7 +8181,7 @@ static uint32_t zone_sum(const radio_sm_t *sm)
 {
 	uint32_t h = sm->have_channels ? 2166136261u ^ sm->zone.count : 0;
 	for (uint16_t i = 0; sm->have_channels && i < sm->zone.count; i++) {
-		h = (h ^ sm->zone.channels[i]) * 16777619u;
+		h = (h ^ zone_channel(&sm->zone, i)) * 16777619u;
 	}
 	return h ^ sm->view.zone_index;
 }
@@ -8206,7 +8206,7 @@ static void reload(radio_sm_t *sm, uint32_t now_ms)
 	memset(sm->lookups, 0, sizeof(sm->lookups));
 	sm->lookup_next = 0;
 #endif
-	uint16_t number = sm->have_channels && sm->view.zone_pos < sm->zone.count ? sm->zone.channels[sm->view.zone_pos] : 0;
+	uint16_t number = sm->have_channels && sm->view.zone_pos < sm->zone.count ? zone_channel(&sm->zone, sm->view.zone_pos) : 0;
 	bool vfo = sm->view.vfo;
 	uint16_t zi = sm->view.zone_index, pos = sm->view.zone_pos;
 #if CONFIG_ZONE_WRITE && CONFIG_SCAN
@@ -8799,7 +8799,7 @@ static void zone_pos_request(radio_sm_t *sm, const radio_req_t *req, bool busy, 
 		return;
 	}
 	uint16_t pos = (uint16_t)req->arg;
-	if (channel_read(sm->zone.channels[pos], &ch)) {
+	if (channel_read(zone_channel(&sm->zone, pos), &ch)) {
 		set_channel(sm, pos, &ch);
 		tune(sm, now_ms);
 	}

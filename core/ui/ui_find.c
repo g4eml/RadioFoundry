@@ -203,7 +203,7 @@ void ui_find_run(void)
 	// 2. Names: channels in this zone
 	uint8_t found = 0;
 	for (uint16_t i = 0; have_zone && i < zone.count && found < 4; i++) {
-		if (codeplug_channel_name(zone.channels[i], rec_name) && ui_t9_match(rec_name, query)) {
+		if (codeplug_channel_name(zone_channel(&zone, i), rec_name) && ui_t9_match(rec_name, query)) {
 			add(FR_CHANNEL, i);
 			found++;
 		}
@@ -345,7 +345,7 @@ static void find_item(uint16_t i, ui_item_t *it)
 		sb_str(&b, TR(FIND_ROW_CH, "Ch "));
 		sb_u32(&b, r->ref + 1u, 1);
 		if (codeplug_zone(v->zone_index, &zone) && r->ref < zone.count &&
-		    codeplug_channel_name(zone.channels[r->ref], rec_name)) {
+		    codeplug_channel_name(zone_channel(&zone, r->ref), rec_name)) {
 			sb_chr(&b, ' ');
 			sb_str(&b, rec_name);
 		}

@@ -102,7 +102,7 @@ static bool find_code(int32_t code, uint16_t first, ui_dual_ref_t *r)
 		if (!codeplug_zone(zi, &z))
 			continue;
 		for (uint16_t p = 0; p < z.count && p < CODEPLUG_ZONE_MAX; p++) {
-			if (z.channels[p] == code) {
+			if (zone_channel(&z, p) == code) {
 				*r = (ui_dual_ref_t){ false, zi, p };
 				return true;
 			}
@@ -205,9 +205,9 @@ static void pane_fill(uint8_t i)
 		if (!ui_svc_vfo_get((uint8_t)ref[i].pos, &ch) && ui_view()->vfo && ui_view()->vfo_index == ref[i].pos)
 			ch = ui_view()->ch;
 	} else {
-		if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count || !codeplug_channel(z.channels[ref[i].pos], &ch))
+		if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count || !codeplug_channel(zone_channel(&z, ref[i].pos), &ch))
 			return;
-		p->number = z.channels[ref[i].pos];
+		p->number = zone_channel(&z, ref[i].pos);
 		strcpy(p->zone, z.name);
 		strcpy(p->name, ch.name);
 	}
@@ -364,12 +364,12 @@ static void snap_seed(uint8_t i, const radio_view_t *v)
 			return;
 		strcpy(s->zone_name, "VFO");
 	} else {
-		if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count || !codeplug_channel(z.channels[ref[i].pos], &s->ch))
+		if (!codeplug_zone(ref[i].zone, &z) || ref[i].pos >= z.count || !codeplug_channel(zone_channel(&z, ref[i].pos), &s->ch))
 			return;
 		s->zone_index = ref[i].zone;
 		s->zone_pos = ref[i].pos;
 		s->zone_size = z.count;
-		s->channel_number = z.channels[ref[i].pos];
+		s->channel_number = zone_channel(&z, ref[i].pos);
 		strcpy(s->zone_name, z.name);
 	}
 	s->valid = true;
@@ -462,7 +462,7 @@ static bool b_default(const ui_dual_ref_t *a, ui_dual_ref_t *out)
 		uint16_t start = k == 0 && !a->vfo ? (uint16_t)(a->pos + 1u) : 0;
 		for (uint16_t j = 0; j < z.count && j < CODEPLUG_ZONE_MAX; j++) {
 			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % z.count) };
-			if (!ref_same(&r, a) && codeplug_channel(z.channels[r.pos], &ch)) {
+			if (!ref_same(&r, a) && codeplug_channel(zone_channel(&z, r.pos), &ch)) {
 				*out = r;
 				return true;
 			}
@@ -612,7 +612,7 @@ static void pane_changed(uint8_t pane, const ui_dual_ref_t *old)
 		chan_ok[pane] = true;
 #if CONFIG_ZONE_WRITE
 		static zone_t z;	// static: not on the UI task's stack
-		chan_num[pane] = codeplug_zone(old->zone, &z) && old->pos < z.count ? z.channels[old->pos] : 0;
+		chan_num[pane] = codeplug_zone(old->zone, &z) && old->pos < z.count ? zone_channel(&z, old->pos) : 0;
 		chan_ok[pane] = chan_num[pane] != 0;
 #endif
 	}
@@ -1306,9 +1306,9 @@ static bool pick_raw_label(uint16_t raw, char *buf, uint8_t len)
 		sb_str(&b, TR(WORD_ZONE, "Zone"));
 		return true;
 	}
-	if (!pick_z_ok || raw - 1u >= z->count || !codeplug_channel_name(z->channels[raw - 1u], name))
+	if (!pick_z_ok || raw - 1u >= z->count || !codeplug_channel_name(zone_channel(z, raw - 1u), name))
 		return false;
-	sb_u32(&b, z->channels[raw - 1u], 1);
+	sb_u32(&b, zone_channel(z, raw - 1u), 1);
 	sb_chr(&b, ' ');
 	sb_str(&b, name);
 	return true;
@@ -1346,7 +1346,7 @@ static void pick_item(uint16_t i, ui_item_t *it)
 		}
 		return;
 	}
-	if (!pick_z_ok || raw - 1u >= pick_z.count || !codeplug_channel(pick_z.channels[raw - 1u], &ch))
+	if (!pick_z_ok || raw - 1u >= pick_z.count || !codeplug_channel(zone_channel(&pick_z, raw - 1u), &ch))
 		return;
 	pick_raw_label(raw, it->label, sizeof it->label);
 	sb_init(&b, it->value, sizeof it->value);

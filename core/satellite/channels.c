@@ -48,7 +48,7 @@ static bool has_channel(const zone_t *zone, const char *name)
 {
 	channel_t channel;
 	for (uint16_t i = 0; i < zone->count; i++) {
-		if (codeplug_channel(zone->channels[i], &channel) && strcmp(channel.name, name) == 0)
+		if (codeplug_channel(zone_channel(zone, i), &channel) && strcmp(channel.name, name) == 0)
 			return true;
 	}
 	return false;
