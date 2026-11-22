@@ -77,13 +77,35 @@ typedef struct {
 	char name[CODEPLUG_NAME_LEN + 1];
 	uint16_t count;
 	uint16_t channels[CODEPLUG_ZONE_MAX];	// codeplug channel numbers, 1-based
+#if CONFIG_ALL_CHANNELS_ZONE
+	// The "All channels" zone (codeplug_zone_every): count is every used channel, up to CODEPLUG_CHANNELS_MAX, and
+	// channels[] is unused. Its channels are read from the in-use bitmap; walk_pos / walk_num are where the last read
+	// was (position, channel number; 0 none), so stepping through the zone in order costs a bit or two a read. The
+	// place holds only while the codeplug is unchanged (walk_serial, codeplug_serial())
+	bool every;
+	uint16_t walk_pos, walk_num;
+	uint32_t walk_serial;
+#endif
 } zone_t;
+
+#if CONFIG_ALL_CHANNELS_ZONE
+// The channel at pos of the "All channels" zone z (zone_channel's, with pos < z->count)
+uint16_t codeplug_every_channel(const zone_t *z, uint16_t pos);
+#endif
 
 // The channel number at position pos (0-based) of z, 0 past its end. Code that reads a zone's channels does it through
 // this, never channels[] directly, so a zone whose list isn't held in channels[] reads the same way
 static inline uint16_t zone_channel(const zone_t *z, uint16_t pos)
 {
-	return pos < z->count ? z->channels[pos] : 0;
+	if (pos >= z->count) {
+		return 0;
+	}
+#if CONFIG_ALL_CHANNELS_ZONE
+	if (z->every) {
+		return codeplug_every_channel(z, pos);
+	}
+#endif
+	return z->channels[pos];
 }
 
 typedef enum { CODEPLUG_NONE, CODEPLUG_BUILTIN, CODEPLUG_OPENFW } codeplug_source_t;
@@ -119,8 +141,16 @@ bool codeplug_channel(uint16_t number, channel_t *out);
 // Reads of a used channel that failed (flash read or record decode), since start-up
 uint32_t codeplug_channel_errors(void);
 
-// Zones 0..count-1. With no zones stored there is one zone "All channels" holding every used channel
+// Zones 0..count-1. With no zones stored there is one zone "All channels" holding every used channel (the first
+// CODEPLUG_ZONE_MAX). With CONFIG_ALL_CHANNELS_ZONE that zone is always there, after the stored zones, and holds every
+// used channel 1..CODEPLUG_CHANNELS_MAX (zone_t.every)
 uint16_t codeplug_zone_count(void);
+// The stored zones: 0 with none, else codeplug_zone_count() without the "All channels" zone. A zone added now goes
+// at this index or below it (codeplug_zone_add_index); the "All channels" zone stays after it
+uint16_t codeplug_zone_stored_count(void);
+// Zone index is the permanent "All channels" zone (CONFIG_ALL_CHANNELS_ZONE; false without it): read only. Zone edits,
+// imports and sharing refuse it
+bool codeplug_zone_every(uint16_t index);
 bool codeplug_zone(uint16_t index, zone_t *out);
 // The name alone, false as codeplug_channel / codeplug_zone: a search by name reads 16 bytes a record, not all of it
 bool codeplug_channel_name(uint16_t number, char out[CODEPLUG_NAME_LEN + 1]);
@@ -143,6 +173,8 @@ bool codeplug_zones_stored(void);
 // flash failed. A change bumps codeplug_serial(), so the radio core knows to re-read its channel ---
 #define CODEPLUG_CHANNELS_MAX	1024
 #define CODEPLUG_ZONES_MAX	68
+// The most positions a zone can have: a stored zone's CODEPLUG_ZONE_MAX, or every channel in the "All channels" zone
+#define CODEPLUG_ZONE_POS_MAX	(CONFIG_ALL_CHANNELS_ZONE ? CODEPLUG_CHANNELS_MAX : CODEPLUG_ZONE_MAX)
 
 // Bumped on every change (edits, and codeplug_reload after the CPS wrote the image)
 uint32_t codeplug_serial(void);

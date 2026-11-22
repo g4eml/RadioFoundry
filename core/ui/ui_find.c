@@ -180,6 +180,28 @@ static bool contact_match(uint16_t index, const contact_t *c, void *ctx)
 }
 #endif
 
+#if CONFIG_ALL_CHANNELS_ZONE
+typedef struct {
+	uint16_t pos;	// the zone position of the next used channel
+	uint8_t found;
+} every_scan_t;
+
+// The "All channels" zone's names, many records per flash read: its position n is the n-th used channel
+static bool every_match(uint16_t number, const char *name, void *ctx)
+{
+	every_scan_t *es = ctx;
+	(void)number;
+	if (name == NULL)
+		return true;
+	if (ui_t9_match(name, query)) {
+		add(FR_CHANNEL, es->pos);
+		es->found++;
+	}
+	es->pos++;
+	return es->found < 4;
+}
+#endif
+
 void ui_find_run(void)
 {
 	char rec_name[CODEPLUG_NAME_LEN + 1];
@@ -202,6 +224,13 @@ void ui_find_run(void)
 	}
 	// 2. Names: channels in this zone
 	uint8_t found = 0;
+#if CONFIG_ALL_CHANNELS_ZONE
+	if (have_zone && zone.every) {
+		every_scan_t es = { 0, 0 };
+		codeplug_channel_names_each(every_match, &es, true);
+		have_zone = false;	// done: the loop below reads a name a flash read
+	}
+#endif
 	for (uint16_t i = 0; have_zone && i < zone.count && found < 4; i++) {
 		if (codeplug_channel_name(zone_channel(&zone, i), rec_name) && ui_t9_match(rec_name, query)) {
 			add(FR_CHANNEL, i);

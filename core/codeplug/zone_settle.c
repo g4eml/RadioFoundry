@@ -12,7 +12,7 @@
 // more, a delete one less (the last stored zone deleted: 1 to 0)
 static uint16_t zone_mark(void)
 {
-	return codeplug_zones_stored() ? codeplug_zone_count() : 0;
+	return codeplug_zone_stored_count();
 }
 
 void zone_settle_begin(bool deleted, uint16_t index)

@@ -460,6 +460,12 @@ void radio_req_channel_step(int8_t dir) { req_steps += dir; req_step_n++; }
 static int hold_zone = -1;
 void input_switch_hold(uint16_t zone) { hold_zone = zone; }
 uint16_t codeplug_zone_count(void) { return 3; }
+// No "All channels" zone in this fake codeplug (CONFIG_ALL_CHANNELS_ZONE's): every zone is a stored one
+uint16_t codeplug_zone_stored_count(void) { return codeplug_zone_count(); }
+bool codeplug_zone_every(uint16_t index) { (void)index; return false; }
+#if CONFIG_ALL_CHANNELS_ZONE
+uint16_t codeplug_every_channel(const zone_t *z, uint16_t pos) { (void)z; (void)pos; return 0; }
+#endif
 static uint32_t fake_serial = 7;
 uint32_t codeplug_serial(void) { return fake_serial; }
 

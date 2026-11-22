@@ -1487,6 +1487,17 @@ static const zone_t *zone_of_frame(void)
 	return &zone_cache;
 }
 
+// A row's number in a zone's list: its position, or in the "All channels" zone the channel's own number
+static uint16_t zone_row_num(const zone_t *z, uint16_t pos)
+{
+#if CONFIG_ALL_CHANNELS_ZONE
+	if (z->every)
+		return zone_channel(z, pos);
+#endif
+	(void)z;
+	return (uint16_t)(pos + 1u);
+}
+
 static uint16_t zone_raw_count(void)
 {
 	zone_cached = 0xFFFF;	// a fresh read when the list opens or the filter changes
@@ -1518,10 +1529,63 @@ static bool zone_raw_label(uint16_t raw, char *buf, uint8_t len)
 	uint16_t pos = (uint16_t)(raw - ZE_ADD);
 	if (pos >= z->count || !codeplug_channel_name(zone_channel(z, pos), name))
 		return false;
-	sb_u32(&b, pos + 1u, 1);
+	sb_u32(&b, zone_row_num(z, pos), 1);
 	sb_chr(&b, ' ');
 	sb_str(&b, name);
 	return true;
+}
+
+#if CONFIG_ALL_CHANNELS_ZONE
+typedef struct {
+	ui_raw_fn fn;
+	void *ctx;
+	uint16_t pos;
+} zone_rows_t;
+
+static bool zone_every_row(uint16_t num, const char *name, void *p)
+{
+	zone_rows_t *r = p;
+	if (name == NULL)
+		return true;	// an empty number: no row
+	char label[40];
+	sbuf_t b;
+	sb_init(&b, label, sizeof label);
+	sb_u32(&b, num, 1);
+	sb_chr(&b, ' ');
+	sb_str(&b, name);
+	return r->fn((uint16_t)(ZE_ADD + r->pos++), label, r->ctx);
+}
+#endif
+
+// Every row in one pass. The "All channels" zone reads its names a few records per flash read
+// (codeplug_channel_names_each): a row at a time, 1024 channels would take a flash read each
+static void zone_raw_each(ui_raw_fn fn, void *ctx, bool labels)
+{
+	uint16_t n = zone_raw_count();		// a fresh read of the zone, as a row-at-a-time pass would start with
+	char label[40];
+#if CONFIG_ALL_CHANNELS_ZONE
+	const zone_t *z = zone_of_frame();
+	if (z->every) {
+		if (ZE_ADD && !fn(0, zone_raw_label(0, label, sizeof label) ? label : NULL, ctx))
+			return;
+		zone_rows_t r = { .fn = fn, .ctx = ctx, .pos = 0 };
+		codeplug_channel_names_each(zone_every_row, &r, labels);
+		if (ZE_ADD && r.pos == z->count)
+			fn((uint16_t)(n - 1u), zone_raw_label((uint16_t)(n - 1u), label, sizeof label) ? label : NULL, ctx);
+		return;
+	}
+#endif
+	(void)labels;
+	for (uint16_t i = 0; i < n; i++) {
+		if (!fn(i, zone_raw_label(i, label, sizeof label) ? label : NULL, ctx))
+			break;
+	}
+}
+
+// Whether a row is there, without reading its name: past the first rows the list steps row by row
+static bool zone_raw_used(uint16_t raw)
+{
+	return raw < zone_of_frame()->count + 2u * ZE_ADD;
 }
 
 // Focus the row of channel number num (0: the channel in use, when this is the zone in use)
@@ -1587,7 +1651,7 @@ static void zone_item(uint16_t i, ui_item_t *it)
 		return;
 	sbuf_t b;
 	sb_init(&b, it->label, sizeof it->label);
-	sb_u32(&b, raw + 1u, 2);
+	sb_u32(&b, zone_row_num(z, raw), 2);
 	sb_chr(&b, ' ');
 	sb_str(&b, ch.name);
 	sb_init(&b, it->value, sizeof it->value);
@@ -1604,6 +1668,10 @@ static void zone_context(uint16_t i)
 	uint16_t raw = ui_filter_raw(i);
 	if (zone_edit_row(raw) != NULL)
 		return;
+	if (codeplug_zone_every(ui_frame()->arg)) {
+		ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+		return;		// read only: a channel is edited from the Channels list
+	}
 	ze_zone = ui_frame()->arg;
 	ui_push(SCR_ZCHANNEL, (uint16_t)(raw - ZE_ADD));
 }
@@ -1616,6 +1684,10 @@ static void zone_select(uint16_t i, bool hold)
 	uint16_t raw = ui_filter_raw(i);
 #if CONFIG_ZONE_EDIT
 	if (zone_edit_row(raw) != NULL) {
+		if (codeplug_zone_every(zi)) {
+			ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+			return;
+		}
 		ze_zone = zi;
 		ui_push(raw == 0 ? SCR_ZPICK : SCR_ZONEEDIT, zi);
 		return;
@@ -2044,8 +2116,8 @@ static void offer_zone_item(uint16_t i, ui_item_t *it)
 	sb_init(&b, it->value, sizeof it->value);
 	sb_u32(&b, z.count, 1);
 	sb_str(&b, TR(SHARE_UNIT_CHANNELS, TEXT_ALT_OPEN " channels" TEXT_ALT_NEXT " ch" TEXT_ALT_CLOSE));
-	if (z.count >= CODEPLUG_ZONE_MAX)
-		it->flags |= UI_ITEM_DIM;
+	if (z.count >= CODEPLUG_ZONE_MAX && !codeplug_zone_every(i))
+		it->flags |= UI_ITEM_DIM;	// full; the "All channels" zone takes any channel (the import writes it)
 }
 
 static void offer_zone_select(uint16_t i, bool hold)
@@ -2086,7 +2158,8 @@ static const ui_scr_def_t zone_screen = {
 	.hint = ZONE_HINT, .empty = TRN(ZONE_EMPTY_NO_CHANNELS, "Empty zone"),
 	.count = ui_filter_count, .item = zone_item, .select = zone_select, .context = ZONE_CONTEXT,
 	.title = zone_title, .enter = zone_enter,
-	.filter = &(const ui_filter_def_t){ .raw_count = zone_raw_count, .raw_label = zone_raw_label },
+	.filter = &(const ui_filter_def_t){ .raw_count = zone_raw_count, .raw_label = zone_raw_label,
+		.raw_each = zone_raw_each, .raw_used = zone_raw_used },
 };
 
 #if CONFIG_ZONE_WRITE
@@ -4349,7 +4422,8 @@ static int chz_pos(uint16_t zi)
 	return zone_list_find(&chz_z, ui_frame()->arg);
 }
 
-static uint16_t chz_count(void) { return codeplug_zone_count(); }
+// Every zone a channel can be put in or taken out of: not the "All channels" zone, which is last
+static uint16_t chz_count(void) { return CONFIG_ALL_CHANNELS_ZONE ? codeplug_zone_stored_count() : codeplug_zone_count(); }
 
 static void chz_item(uint16_t i, ui_item_t *it)
 {
@@ -4407,6 +4481,8 @@ static void zopt_item(uint16_t i, ui_item_t *it)
 	item_num(it, (uint16_t)(i + 1u));
 	if (i == ZO_DELETE)
 		it->flags |= UI_ITEM_WARN;
+	if (codeplug_zone_every(ze_zone))
+		it->flags |= UI_ITEM_DIM;	// the "All channels" zone: read only
 #if CONFIG_ZONE_SHARE
 	if (i == ZO_SEND && !(feats() & UI_FEAT_ZONE_SHARE))
 		it->flags |= UI_ITEM_DIM;
@@ -4443,7 +4519,7 @@ static void zones_new_named(void)
 
 static void zones_new(void)
 {
-	if (codeplug_zone_count() >= CODEPLUG_ZONES_MAX && codeplug_zones_stored()) {
+	if (codeplug_zone_stored_count() >= CODEPLUG_ZONES_MAX) {
 		ui_toast(TR(ZONE_ERR_NO_ROOM, "No room for another zone"));
 		return;
 	}
@@ -4455,12 +4531,16 @@ static void zones_new(void)
 static void zopt_select(uint16_t i, bool hold)
 {
 	(void)hold;
+	if (codeplug_zone_every(ze_zone)) {
+		ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+		return;
+	}
 	if (i == ZO_RENAME) {
 		strcpy(ze_name, ze_z.name);
 		ui_text_open(ze_name, CODEPLUG_NAME_LEN);
 		text_done = ze_renamed;
 	} else if (i == ZO_COPY) {
-		if (codeplug_zone_count() >= CODEPLUG_ZONES_MAX) {
+		if (codeplug_zone_stored_count() >= CODEPLUG_ZONES_MAX) {
 			ui_toast(TR(ZONE_ERR_NO_ROOM, "No room for another zone"));
 			return;
 		}

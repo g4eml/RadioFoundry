@@ -181,6 +181,7 @@ below are for an STM32F4 radio.
 | `CONFIG_CHANNEL_EDIT` | = `CHANNEL_LIST` | editing a channel on the radio, New channel from current settings, keypad text entry (`docs/spec/ui.md` 2.1). Needs `CONFIG_CHANNEL_LIST`; without it the channel's settings are read only |
 | `CONFIG_VOLUME_BAR` | y | the volume bar over the screen for 3 s when a knob the MCU reads turns (`docs/spec/radio-features.md` 4.2). About 0.5 KB flash. Off, turning the knob shows nothing |
 | `CONFIG_ZONE_EDIT` | = `CHANNEL_EDIT` | the zone editor in a zone's list: add, move, copy here and remove channels; rename, copy and delete zones (`docs/spec/ui.md` 2.2). Needs `CONFIG_CHANNEL_EDIT`; without it a zone's list only goes to its channels |
+| `CONFIG_ALL_CHANNELS_ZONE` | on | a permanent, read-only "All channels" zone after the stored zones: every used channel 1..1024 in number order, the list shows channel numbers (`docs/spec/ui.md` 2.2). Off: the radio shows "All channels" (the first 80 channels) only when no zones are stored |
 | `CONFIG_CONTACT_EDIT` | = `CHANNEL_EDIT` and `DMR` | the contact editor: a new contact from Find's Create contact or Save as contact in actions (`docs/spec/ui.md` 2.4). Needs `CONFIG_CHANNEL_EDIT` and `CONFIG_DMR`; without it contacts come only from a CPS |
 | `CONFIG_KEY_ASSIGN` | y | key assignment: Settings > Keys and the codeplug's quick-key slots say what the board's programmable keys do (`docs/spec/ui.md` 3.1) |
 | `CONFIG_SCAN` | y | zone, VFO band and dual watch scan (`docs/spec/radio-features.md` 2) |

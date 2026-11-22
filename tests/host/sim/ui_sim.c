@@ -966,6 +966,12 @@ static uint16_t sim_zone_written;
 static bool sim_zone_builtin(uint16_t index, zone_t *out);
 
 uint16_t codeplug_zone_count(void) { return sim_zones_edited ? sim_zn : 3; }
+// No "All channels" zone in this fake codeplug (CONFIG_ALL_CHANNELS_ZONE's): every zone is a stored one
+uint16_t codeplug_zone_stored_count(void) { return codeplug_zone_count(); }
+bool codeplug_zone_every(uint16_t index) { (void)index; return false; }
+#if CONFIG_ALL_CHANNELS_ZONE
+uint16_t codeplug_every_channel(const zone_t *z, uint16_t pos) { (void)z; (void)pos; return 0; }
+#endif
 
 // A codeplug written while the radio runs (cpwrite, cpdel:N, zonesize:Z,N): codeplug_serial() moves on
 static uint32_t sim_cp_serial;

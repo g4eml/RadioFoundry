@@ -282,7 +282,7 @@ bool ui_svc_dual(const ui_dual_ref_t ref[2], uint8_t sel)
 		if (r[i].vfo) {
 			if (!(CONFIG_VFO_FM || CONFIG_VFO_DMR))
 				return false;
-		} else if (r[i].pos >= CODEPLUG_ZONE_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
+		} else if (r[i].pos >= CODEPLUG_ZONE_POS_MAX || !codeplug_zone(r[i].zone, &z) || r[i].pos >= z.count ||
 			   !codeplug_channel(zone_channel(&z, r[i].pos), &ch) || codeplug_kind_trunked(ch.kind)) {
 			return false;	// a trunked channel (P25 or Tier III) follows its system: not one to watch
 		}

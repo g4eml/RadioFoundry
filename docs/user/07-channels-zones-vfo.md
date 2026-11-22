@@ -71,6 +71,16 @@ Moving, adding and removing keep the radio on its channel. Removing the channel 
 next channel in the zone. A zone holds a channel once, and the radio refuses a channel past the zone's size ("Zone
 full"). A radio whose codeplug has no zones shows one zone, "All channels"; the first change saves it as a real zone.
 
+### The All channels zone
+
+On a build with the All channels zone (on by default), the last zone in the list is always **All channels**. It
+holds every channel the radio has, 1 to 1024, in channel number order, and skips empty numbers. Its list shows each
+channel's own number, so channels you keep in number ranges (simplex 1-100, PMR446 700-800, for example) stay
+together. Home shows where you are in the zone and how many channels it has, as in any zone.
+
+You can't edit, rename, copy, share or delete it: it changes by itself when you add or delete a channel. To change a
+channel, use the Channels list. Adding or deleting other zones doesn't move you out of it.
+
 Deleting the zone you are using moves the radio to the zone that comes after it in the list (or the one before, when
 it was last). Dual watch keeps watching a channel from a deleted zone when another zone holds it, and otherwise
 stops. A zone marked for roaming loses the mark when it is deleted; the other marks stay on their zones.

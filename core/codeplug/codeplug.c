@@ -909,7 +909,17 @@ uint16_t codeplug_zone_count(void)
 	if (source == CODEPLUG_NONE) {
 		return 0;
 	}
-	return zone_count > 0 ? zone_count : 1;
+	return CONFIG_ALL_CHANNELS_ZONE ? (uint16_t)(zone_count + 1u) : zone_count > 0 ? zone_count : 1;
+}
+
+uint16_t codeplug_zone_stored_count(void)
+{
+	return codeplug_zones_stored() ? zone_count : 0;
+}
+
+bool codeplug_zone_every(uint16_t index)
+{
+	return CONFIG_ALL_CHANNELS_ZONE && source != CODEPLUG_NONE && index == zone_count;
 }
 
 bool codeplug_zones_stored(void)
@@ -920,15 +930,82 @@ bool codeplug_zones_stored(void)
 // The virtual zone: every used channel, as many as a zone_t holds
 #define ALL_CHANNELS	"All channels"	// the zone there is without stored ones
 
+#if CONFIG_ALL_CHANNELS_ZONE
+// The next used channel after number n in dir (+1 / -1), 0 when there is none. A bitmap byte of empty numbers is
+// skipped whole
+static uint16_t used_step(uint16_t n, int dir)
+{
+	uint16_t top = codeplug_channel_count();
+	if (source == CODEPLUG_BUILTIN) {
+		return dir > 0 ? (n < top ? (uint16_t)(n + 1u) : 0) : (n > 1 && n - 1u <= top ? (uint16_t)(n - 1u) : 0);
+	}
+	int m = (int)n + dir;
+	while (m >= 1 && m <= (int)top) {
+		if (used[(m - 1) / 8] == 0) {
+			m = dir > 0 ? ((m - 1) / 8 + 1) * 8 + 1 : ((m - 1) / 8) * 8;	// past this byte's numbers
+			continue;
+		}
+		if (is_used((uint16_t)m)) {
+			return (uint16_t)m;
+		}
+		m += dir;
+	}
+	return 0;
+}
+
+uint16_t codeplug_every_channel(const zone_t *z, uint16_t pos)
+{
+	// The walk's place is a cache, not the zone's content: each zone_t copy keeps its own, so tasks never share one
+	zone_t *w = (zone_t *)z;
+	uint16_t at = w->walk_pos, n = w->walk_num;
+	if (n == 0 || w->walk_serial != serial || (pos < at && at - pos > pos)) {
+		at = 0;			// nearer the start than the last read (or none yet): from the first channel
+		n = used_step(0, 1);
+	}
+	while (n != 0 && at < pos) {
+		n = used_step(n, 1);
+		at++;
+	}
+	while (n != 0 && at > pos) {
+		n = used_step(n, -1);
+		at--;
+	}
+	w->walk_pos = n != 0 ? at : 0;	// the bitmap changed under a stale zone_t: it reads 0 past its new end
+	w->walk_num = n;
+	w->walk_serial = serial;
+	return n;
+}
+
+// Every used channel 1..CODEPLUG_CHANNELS_MAX
+static uint16_t used_count(void)
+{
+	uint16_t top = codeplug_channel_count(), k = 0;
+	if (source == CODEPLUG_BUILTIN) {
+		return top;
+	}
+	for (uint16_t i = 0; i < (top + 7u) / 8u; i++) {
+		for (uint8_t b = used[i]; b != 0; b &= (uint8_t)(b - 1u)) {
+			k++;
+		}
+	}
+	return k;
+}
+#endif
+
 static void all_channels(zone_t *out)
 {
 	strncpy(out->name, ALL_CHANNELS, CODEPLUG_NAME_LEN);
+#if CONFIG_ALL_CHANNELS_ZONE
+	out->every = true;
+	out->count = used_count();
+#else
 	uint16_t top = codeplug_channel_count();
 	for (uint16_t n = 1; n <= top && out->count < CODEPLUG_ZONE_MAX; n++) {
 		if (source == CODEPLUG_BUILTIN || is_used(n)) {
 			out->channels[out->count++] = n;
 		}
 	}
+#endif
 }
 
 bool codeplug_zone(uint16_t index, zone_t *out)
@@ -940,8 +1017,8 @@ bool codeplug_zone(uint16_t index, zone_t *out)
 		return false;
 	}
 	memset(out, 0, sizeof(*out));
-	if (zone_count == 0) {
-		all_channels(out);
+	if (zone_count == 0 || index == zone_count) {
+		all_channels(out);	// index zone_count: CONFIG_ALL_CHANNELS_ZONE's, after the stored zones
 	} else {
 		uint8_t r[ZONE_RECORD_80];
 		ok = flash_read(ZONE_DATA + zone_slot[index] * zone_record, r, zone_record);
@@ -969,7 +1046,7 @@ bool codeplug_zone_name(uint16_t index, char out[CODEPLUG_NAME_LEN + 1])
 	storage_lock();
 	if (index >= codeplug_zone_count()) {
 		ok = false;
-	} else if (zone_count == 0) {
+	} else if (zone_count == 0 || index == zone_count) {
 		strncpy(out, ALL_CHANNELS, CODEPLUG_NAME_LEN + 1);
 		ok = true;
 	} else {
@@ -1174,6 +1251,11 @@ bool codeplug_set_zone(uint16_t index, const zone_t *z)
 	if (z->count > CODEPLUG_ZONE_MAX || z->name[0] == '\0') {
 		return false;
 	}
+#if CONFIG_ALL_CHANNELS_ZONE
+	if (z->every) {
+		return false;		// the "All channels" zone holds no list to store
+	}
+#endif
 	storage_lock();
 	bool ok = materialize();
 	// Every channel must exist

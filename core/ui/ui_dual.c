@@ -101,7 +101,7 @@ static bool find_code(int32_t code, uint16_t first, ui_dual_ref_t *r)
 		uint16_t zi = (uint16_t)((first + k) % n);
 		if (!codeplug_zone(zi, &z))
 			continue;
-		for (uint16_t p = 0; p < z.count && p < CODEPLUG_ZONE_MAX; p++) {
+		for (uint16_t p = 0; p < z.count && p < CODEPLUG_ZONE_POS_MAX; p++) {
 			if (zone_channel(&z, p) == code) {
 				*r = (ui_dual_ref_t){ false, zi, p };
 				return true;
@@ -460,7 +460,7 @@ static bool b_default(const ui_dual_ref_t *a, ui_dual_ref_t *out)
 		if (!codeplug_zone(zi, &z) || z.count == 0)
 			continue;
 		uint16_t start = k == 0 && !a->vfo ? (uint16_t)(a->pos + 1u) : 0;
-		for (uint16_t j = 0; j < z.count && j < CODEPLUG_ZONE_MAX; j++) {
+		for (uint16_t j = 0; j < z.count && j < CODEPLUG_ZONE_POS_MAX; j++) {
 			ui_dual_ref_t r = { false, zi, (uint16_t)((start + j) % z.count) };
 			if (!ref_same(&r, a) && codeplug_channel(zone_channel(&z, r.pos), &ch)) {
 				*out = r;

@@ -175,12 +175,12 @@ scan_act_t scan_poll(scan_t *s, uint32_t now_ms, bool active, bool carrier, bool
 
 bool scan_pos_skipped(const scan_t *s, uint16_t pos)
 {
-	return pos < CODEPLUG_ZONE_MAX && (s->skip[pos / 8] & (1u << (pos % 8))) != 0;
+	return pos < CODEPLUG_ZONE_POS_MAX && (s->skip[pos / 8] & (1u << (pos % 8))) != 0;
 }
 
 bool scan_nuisance_pos(scan_t *s, uint16_t pos)
 {
-	if (pos >= CODEPLUG_ZONE_MAX || scan_pos_skipped(s, pos)) {
+	if (pos >= CODEPLUG_ZONE_POS_MAX || scan_pos_skipped(s, pos)) {
 		return false;
 	}
 	s->skip[pos / 8] |= (uint8_t)(1u << (pos % 8));

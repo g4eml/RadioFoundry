@@ -1250,8 +1250,8 @@ static bool read_zone(uint16_t index, zone_t *z)
 	if (!codeplug_zone(index, z)) {
 		return false;
 	}
-	if (z->count > CODEPLUG_ZONE_MAX) {
-		z->count = CODEPLUG_ZONE_MAX;
+	if (z->count > CODEPLUG_ZONE_POS_MAX) {
+		z->count = CODEPLUG_ZONE_POS_MAX;
 	}
 	return z->count > 0;
 }
@@ -5125,8 +5125,10 @@ static void scan_start(radio_sm_t *sm, uint8_t kind, uint32_t lo_hz, uint32_t hi
 	sc->hi_hz = hi_hz;
 	scan_begin(sc, kind, &cfg, now_ms);
 	if (kind != SCAN_VFO) {
-		// Nothing to scan when no other channel qualifies
-		scan_t probe = *sc;
+		// Nothing to scan when no other channel qualifies. Static: a scan_t with the "All channels" zone's skips is
+		// too big for the radio task's stack
+		static scan_t probe;
+		probe = *sc;
 		int next = scan_next_pos(&probe, sm->zone.count, scan_usable, sm);
 		if (next < 0 || next == sm->view.zone_pos) {
 			scan_end(sc);

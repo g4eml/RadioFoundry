@@ -11,7 +11,7 @@
 int zone_list_find(const zone_t *z, uint16_t channel)
 {
 	for (uint16_t i = 0; i < z->count; i++) {
-		if (z->channels[i] == channel) {
+		if (zone_channel(z, i) == channel) {
 			return i;
 		}
 	}
@@ -80,24 +80,25 @@ static zone_edit_result_t write_back(uint16_t zone)
 	return codeplug_set_zone(zone, &work) ? ZONE_EDIT_OK : ZONE_EDIT_FAILED;
 }
 
-// Read zone into work; the caller holds the storage lock
+// Read zone into work; the caller holds the storage lock. The "All channels" zone holds no list to edit
 static zone_edit_result_t load(uint16_t zone)
 {
-	if (zone >= codeplug_zone_count() || !codeplug_zone(zone, &work)) {
+	if (zone >= codeplug_zone_count() || codeplug_zone_every(zone) || !codeplug_zone(zone, &work)) {
 		return ZONE_EDIT_NO_ZONE;
 	}
 	return ZONE_EDIT_OK;
 }
 
 // Room for one more zone. Without stored zones the radio shows one virtual zone ("All channels"): it is stored first,
-// so the user keeps the zone they saw and the new one comes after it. Refused while a detour holds the settings (before
-// anything is written): the saved indexes couldn't move with the zones
+// so the user keeps the zone they saw and the new one comes after it. With CONFIG_ALL_CHANNELS_ZONE that zone stays
+// (after the stored ones): nothing is stored for it. Refused while a detour holds the settings (before anything is
+// written): the saved indexes couldn't move with the zones
 static zone_edit_result_t make_room(void)
 {
 	if (settings_held()) {
 		return ZONE_EDIT_FAILED;
 	}
-	if (!codeplug_zones_stored()) {
+	if (!CONFIG_ALL_CHANNELS_ZONE && !codeplug_zones_stored()) {
 		if (load(0) != ZONE_EDIT_OK || work.count == 0) {
 			return ZONE_EDIT_OK;	// nothing to keep (no channels): the new zone is the first
 		}
@@ -105,10 +106,11 @@ static zone_edit_result_t make_room(void)
 			return ZONE_EDIT_FAILED;
 		}
 	}
-	return codeplug_zone_count() >= CODEPLUG_ZONES_MAX ? ZONE_EDIT_ZONES_FULL : ZONE_EDIT_OK;
+	return codeplug_zone_stored_count() >= CODEPLUG_ZONES_MAX ? ZONE_EDIT_ZONES_FULL : ZONE_EDIT_OK;
 }
 
-// work, written as a new zone after make_room; logged as a shift unless it is the first zone (nothing moves)
+// work, written as a new zone after make_room; logged as a shift unless it is the first zone (nothing moves; with
+// CONFIG_ALL_CHANNELS_ZONE the "All channels" zone moves on, so the first is logged too)
 static zone_edit_result_t create_locked(uint16_t *index)
 {
 	if (work.name[0] == '\0') {
@@ -127,11 +129,11 @@ static zone_edit_result_t create_locked(uint16_t *index)
 			}
 		}
 	}
-	bool first = !codeplug_zones_stored();
+	bool first = !CONFIG_ALL_CHANNELS_ZONE && !codeplug_zones_stored();
 	if (!first) {
 		zone_settle_begin(false, codeplug_zone_add_index());	// the saved indexes, should the power go now
 	}
-	zone_edit_result_t r = write_back(first ? 0 : codeplug_zone_count());
+	zone_edit_result_t r = write_back(codeplug_zone_stored_count());
 	if (r == ZONE_EDIT_OK) {
 		uint16_t at = codeplug_zone_written();
 		if (!first) {
@@ -298,7 +300,7 @@ zone_edit_result_t zone_edit_delete(uint16_t zone)
 {
 	storage_lock();
 	zone_shift_busy(true);
-	zone_edit_result_t r = zone < codeplug_zone_count() && codeplug_zones_stored() ? ZONE_EDIT_OK : ZONE_EDIT_NO_ZONE;
+	zone_edit_result_t r = zone < codeplug_zone_stored_count() ? ZONE_EDIT_OK : ZONE_EDIT_NO_ZONE;
 	if (r == ZONE_EDIT_OK && settings_held()) {
 		r = ZONE_EDIT_FAILED;	// a detour holds the settings: the saved indexes couldn't move with the zones
 	}

@@ -54,7 +54,7 @@ typedef struct {
 	uint16_t sweep_pos;	// the zone sweep's last position (priority revisits don't move it)
 	uint8_t since_priority;	// stops since the start channel
 	// Nuisance delete: zone positions, or VFO frequencies, left out until the scan stops
-	uint8_t skip[(CODEPLUG_ZONE_MAX + 7) / 8];
+	uint8_t skip[(CODEPLUG_ZONE_POS_MAX + 7) / 8];
 	uint32_t skip_hz[SCAN_VFO_NUISANCE_MAX];
 	uint8_t skipped;
 	// VFO range (inclusive)

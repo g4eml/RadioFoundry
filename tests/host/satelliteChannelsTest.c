@@ -89,6 +89,12 @@ uint16_t codeplug_zone_count(void)
 {
 	return zone_count;
 }
+// No "All channels" zone in this fake codeplug (CONFIG_ALL_CHANNELS_ZONE's): every zone is a stored one
+uint16_t codeplug_zone_stored_count(void) { return codeplug_zone_count(); }
+bool codeplug_zone_every(uint16_t index) { (void)index; return false; }
+#if CONFIG_ALL_CHANNELS_ZONE
+uint16_t codeplug_every_channel(const zone_t *z, uint16_t pos) { (void)z; (void)pos; return 0; }
+#endif
 
 bool codeplug_zone(uint16_t index, zone_t *zone)
 {

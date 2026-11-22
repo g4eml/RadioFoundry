@@ -539,7 +539,7 @@ static int find_zone(const char *name, int skip)
 	uint16_t n = codeplug_zone_count();
 
 	for (uint16_t i = 0; i < n; i++) {
-		if ((int)i != skip && codeplug_zone(i, &z) && name_eq(z.name, name)) {
+		if ((int)i != skip && !codeplug_zone_every(i) && codeplug_zone(i, &z) && name_eq(z.name, name)) {
 			return i;
 		}
 	}
@@ -576,7 +576,8 @@ static bool in_other_zone(uint16_t n, int skip)
 	uint16_t count = codeplug_zone_count();
 
 	for (uint16_t i = 0; i < count; i++) {
-		if ((int)i == skip || !codeplug_zone(i, &new_zone)) {
+		// the "All channels" zone holds every channel: only a zone's own list counts
+		if ((int)i == skip || codeplug_zone_every(i) || !codeplug_zone(i, &new_zone)) {
 			continue;
 		}
 		for (uint16_t k = 0; k < new_zone.count; k++) {
@@ -746,13 +747,15 @@ zone_import_status_t zone_import_zone(const uint8_t *record, int length, uint32_
 		}
 	}
 	bool stored = codeplug_zones_stored();
+	// With CONFIG_ALL_CHANNELS_ZONE the "All channels" zone stays as it is: nothing is stored for it
+	bool keep_virtual = !stored && !CONFIG_ALL_CHANNELS_ZONE;
 
-	if (target < 0 && stored && codeplug_zone_count() >= CODEPLUG_ZONES_MAX) {
+	if (target < 0 && stored && codeplug_zone_stored_count() >= CODEPLUG_ZONES_MAX) {
 		return ZI_NO_ZONE;
 	}
 	// No zones stored yet: the virtual "All channels" zone (the first CODEPLUG_ZONE_MAX channels, as the user sees it)
 	// is read now, before our channels are written (it would list them too), and stored as zone 0 below
-	if (!stored) {
+	if (keep_virtual) {
 		if (!codeplug_zone(0, &old_zone)) {
 			return ZI_NO_ZONE;
 		}
@@ -779,7 +782,7 @@ zone_import_status_t zone_import_zone(const uint8_t *record, int length, uint32_
 	} else {
 		unique_name(rec.name, -1, new_zone.name);
 	}
-	if (!stored) {
+	if (keep_virtual) {
 		// The first stored zone takes index 0, which the virtual zone had: no index moves
 		if (!codeplug_set_zone(0, &old_zone)) {
 			undo();
@@ -802,7 +805,7 @@ zone_import_status_t zone_import_zone(const uint8_t *record, int length, uint32_
 		zone_edit_result_t er = zone_edit_create(&new_zone, &index);
 
 		if (er != ZONE_EDIT_OK) {
-			if (!stored) {
+			if (keep_virtual) {
 				codeplug_delete_zone(0);
 			}
 			undo();
@@ -831,10 +834,12 @@ zone_import_status_t zone_import_channel(const uint8_t *record, int length, uint
 	}
 	bool stored = codeplug_zones_stored();
 
-	// Without stored zones the only zone is the virtual one, which lists every channel by itself
+	// Without stored zones the only zone is the virtual one, which lists every channel by itself; so does
+	// CONFIG_ALL_CHANNELS_ZONE's "All channels" zone. A zone of its own list gets the channel added
 	if ((!stored && zone != 0) || !codeplug_zone(zone, &old_zone)) {
 		return ZI_NO_ZONE;
 	}
+	stored = stored && !codeplug_zone_every(zone);
 	if (stored && old_zone.count >= codeplug_zone_capacity()) {
 		return ZI_ZONE_FULL;
 	}
@@ -1203,7 +1208,8 @@ int zone_export_zone(uint16_t zone, uint8_t *out, int size, uint8_t *included)
 	// Its own copy: an export (the UI task) may run while an import job holds old_zone and new_zone
 	static zone_t ex_zone;
 
-	if (!codeplug_zone(zone, &ex_zone)) {
+	// The "All channels" zone isn't sent: it is every channel, not a list
+	if (codeplug_zone_every(zone) || !codeplug_zone(zone, &ex_zone)) {
 		return 0;
 	}
 	return export_list(ex_zone.name, 0, ex_zone.channels, ex_zone.count, out, size, included);

@@ -291,6 +291,15 @@ they show the change within a fraction of a second.
   are at most `CODEPLUG_ZONES_MAX` zones.
 - With no zones stored the radio shows one zone, "All channels", that holds every channel. The first change stores it
   as a real zone 0, so the user keeps what they saw; it can't be deleted until then ("It holds every channel").
+- With `CONFIG_ALL_CHANNELS_ZONE` "All channels" is permanent instead. It is always the last zone
+  (`codeplug_zone_every`), after the stored ones, and holds every used channel 1..`CODEPLUG_CHANNELS_MAX` in number
+  order. Nothing is stored for it: its positions are read from the in-use bitmap (`zone_channel`, which every reader
+  of a zone uses), so 1024 positions cost no RAM for a list. Its list shows each channel's own number, not its
+  position; Home shows the position and the zone's size as in any zone. It is read only: Add channel, Zone options and
+  a channel's zone actions toast "It holds every channel: it stays", the zone editor and `codeplug_set_zone` refuse
+  it, In Zones doesn't list it, and it is never sent by zone sharing. A zone added or deleted moves its index like any
+  zone after it, so the zone in use follows it (`zone_settle.c`). `codeplug_zone_stored_count()` is the stored zones,
+  without it
 - A new zone takes the lowest free slot, so it can come ahead of zones already there, and deleting a zone moves the
   ones after it up. `zone_edit.c` logs each such shift (`zone_edit_shifts`, the last `ZONE_SHIFT_LOG` = 8 kept), and
   every holder of a zone index maps it with `zone_edit_map` once no zone write is under way (`zone_edit_busy`). Zone
