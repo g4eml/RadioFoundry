@@ -295,8 +295,9 @@ they show the change within a fraction of a second.
   (`codeplug_zone_every`), after the stored ones, and holds every used channel 1..`CODEPLUG_CHANNELS_MAX` in number
   order. Nothing is stored for it: its positions are read from the in-use bitmap (`zone_channel`, which every reader
   of a zone uses), so 1024 positions cost no RAM for a list. Its list shows each channel's own number, not its
-  position; Home shows the position and the zone's size as in any zone. It is read only: Add channel, Zone options and
-  a channel's zone actions toast "Not Available in All Channels Zone", the zone editor and `codeplug_set_zone` refuse
+  position; Home shows the position and the zone's size as in any zone. It is read only: its list has no Add channel
+  or Zone options rows, a channel's zone actions toast "Not Available in All Channels Zone", the zone editor and
+  `codeplug_set_zone` refuse
   it, In Zones doesn't list it, and it is never sent by zone sharing. A zone added or deleted moves its index like any
   zone after it, so the zone in use follows it (`zone_settle.c`). `codeplug_zone_stored_count()` is the stored zones,
   without it

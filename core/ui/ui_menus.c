@@ -1487,6 +1487,17 @@ static const zone_t *zone_of_frame(void)
 	return &zone_cache;
 }
 
+// The editor's rows before a zone's channels in its list: "Add channel" (and "Zone options" after them), none in the
+// "All channels" zone, which is read only
+static uint16_t zone_add(void)
+{
+#if CONFIG_ALL_CHANNELS_ZONE
+	if (zone_of_frame()->every)
+		return 0;
+#endif
+	return ZE_ADD;
+}
+
 // A row's number in a zone's list: its position, or in the "All channels" zone the channel's own number
 static uint16_t zone_row_num(const zone_t *z, uint16_t pos)
 {
@@ -1501,13 +1512,15 @@ static uint16_t zone_row_num(const zone_t *z, uint16_t pos)
 static uint16_t zone_raw_count(void)
 {
 	zone_cached = 0xFFFF;	// a fresh read when the list opens or the filter changes
-	return (uint16_t)(zone_of_frame()->count + 2u * ZE_ADD);
+	return (uint16_t)(zone_of_frame()->count + 2u * zone_add());
 }
 
 #if CONFIG_ZONE_EDIT
 // The editor's rows: their label, NULL for a channel's row
 static const char *zone_edit_row(uint16_t raw)
 {
+	if (zone_add() == 0)
+		return NULL;
 	if (raw == 0)
 		return TR(ZONE_ROW_ADD_CHANNEL, "Add channel");
 	return raw > zone_of_frame()->count ? TR(ZONE_ROW_OPTIONS, "Zone options") : NULL;
@@ -1526,7 +1539,7 @@ static bool zone_raw_label(uint16_t raw, char *buf, uint8_t len)
 		return true;
 	}
 #endif
-	uint16_t pos = (uint16_t)(raw - ZE_ADD);
+	uint16_t pos = (uint16_t)(raw - zone_add());
 	if (pos >= z->count || !codeplug_channel_name(zone_channel(z, pos), name))
 		return false;
 	sb_u32(&b, zone_row_num(z, pos), 1);
@@ -1553,7 +1566,7 @@ static bool zone_every_row(uint16_t num, const char *name, void *p)
 	sb_u32(&b, num, 1);
 	sb_chr(&b, ' ');
 	sb_str(&b, name);
-	return r->fn((uint16_t)(ZE_ADD + r->pos++), label, r->ctx);
+	return r->fn(r->pos++, label, r->ctx);	// no editor rows before them
 }
 #endif
 
@@ -1566,12 +1579,8 @@ static void zone_raw_each(ui_raw_fn fn, void *ctx, bool labels)
 #if CONFIG_ALL_CHANNELS_ZONE
 	const zone_t *z = zone_of_frame();
 	if (z->every) {
-		if (ZE_ADD && !fn(0, zone_raw_label(0, label, sizeof label) ? label : NULL, ctx))
-			return;
 		zone_rows_t r = { .fn = fn, .ctx = ctx, .pos = 0 };
-		codeplug_channel_names_each(zone_every_row, &r, labels);
-		if (ZE_ADD && r.pos == z->count)
-			fn((uint16_t)(n - 1u), zone_raw_label((uint16_t)(n - 1u), label, sizeof label) ? label : NULL, ctx);
+		codeplug_channel_names_each(zone_every_row, &r, labels);	// the channels only: no editor rows
 		return;
 	}
 #endif
@@ -1585,7 +1594,7 @@ static void zone_raw_each(ui_raw_fn fn, void *ctx, bool labels)
 // Whether a row is there, without reading its name: past the first rows the list steps row by row
 static bool zone_raw_used(uint16_t raw)
 {
-	return raw < zone_of_frame()->count + 2u * ZE_ADD;
+	return raw < zone_of_frame()->count + 2u * zone_add();
 }
 
 // Focus the row of channel number num (0: the channel in use, when this is the zone in use)
@@ -1594,7 +1603,7 @@ static void zone_focus(uint16_t num)
 	const radio_view_t *v = ui_view();
 	const zone_t *z = zone_of_frame();
 	for (uint16_t i = 0; i < ui_filter_count(); i++) {
-		uint16_t pos = (uint16_t)(ui_filter_raw(i) - ZE_ADD);
+		uint16_t pos = (uint16_t)(ui_filter_raw(i) - zone_add());
 		if (pos >= z->count)
 			continue;
 		if (num != 0 ? zone_channel(z, pos) == num : !v->vfo && v->zone_index == ui_frame()->arg && pos == v->zone_pos)
@@ -1646,7 +1655,7 @@ static void zone_item(uint16_t i, ui_item_t *it)
 		return;
 	}
 #endif
-	raw = (uint16_t)(raw - ZE_ADD);		// the position in the zone
+	raw = (uint16_t)(raw - zone_add());		// the position in the zone
 	if (raw >= z->count || !codeplug_channel(zone_channel(z, raw), &ch))
 		return;
 	sbuf_t b;
@@ -1673,7 +1682,7 @@ static void zone_context(uint16_t i)
 		return;		// read only: a channel is edited from the Channels list
 	}
 	ze_zone = ui_frame()->arg;
-	ui_push(SCR_ZCHANNEL, (uint16_t)(raw - ZE_ADD));
+	ui_push(SCR_ZCHANNEL, (uint16_t)(raw - zone_add()));
 }
 #endif
 
@@ -1684,10 +1693,6 @@ static void zone_select(uint16_t i, bool hold)
 	uint16_t raw = ui_filter_raw(i);
 #if CONFIG_ZONE_EDIT
 	if (zone_edit_row(raw) != NULL) {
-		if (codeplug_zone_every(zi)) {
-			ui_toast(TR(ZONE_TOAST_NOT_IN_ALL_CHANNELS, "Not Available in All Channels Zone"));
-			return;
-		}
 		ze_zone = zi;
 		ui_push(raw == 0 ? SCR_ZPICK : SCR_ZONEEDIT, zi);
 		return;
@@ -1699,7 +1704,7 @@ static void zone_select(uint16_t i, bool hold)
 #endif
 	(void)hold;
 	const zone_t *z = zone_of_frame();
-	uint16_t pos = (uint16_t)(raw - ZE_ADD);
+	uint16_t pos = (uint16_t)(raw - zone_add());
 	if (pos < z->count && ch_locked(zone_channel(z, pos)))
 		return;
 	if (v->vfo)
