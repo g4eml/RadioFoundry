@@ -1938,6 +1938,11 @@ msgid "Zone options"
 msgstr "Opzioni zona"
 
 #: core/ui/ui_menus.c
+msgctxt "ZONE_TOAST_NOT_IN_ALL_CHANNELS"
+msgid "Not Available in All Channels Zone"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "SHARE_ROW_ZONE_TO"
 msgid "⤒ Share zone to..."
 msgstr "⤒ Condividi zona a..."

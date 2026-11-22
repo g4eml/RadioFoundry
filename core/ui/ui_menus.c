@@ -1669,7 +1669,7 @@ static void zone_context(uint16_t i)
 	if (zone_edit_row(raw) != NULL)
 		return;
 	if (codeplug_zone_every(ui_frame()->arg)) {
-		ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+		ui_toast(TR(ZONE_TOAST_NOT_IN_ALL_CHANNELS, "Not Available in All Channels Zone"));
 		return;		// read only: a channel is edited from the Channels list
 	}
 	ze_zone = ui_frame()->arg;
@@ -1685,7 +1685,7 @@ static void zone_select(uint16_t i, bool hold)
 #if CONFIG_ZONE_EDIT
 	if (zone_edit_row(raw) != NULL) {
 		if (codeplug_zone_every(zi)) {
-			ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+			ui_toast(TR(ZONE_TOAST_NOT_IN_ALL_CHANNELS, "Not Available in All Channels Zone"));
 			return;
 		}
 		ze_zone = zi;
@@ -4532,7 +4532,7 @@ static void zopt_select(uint16_t i, bool hold)
 {
 	(void)hold;
 	if (codeplug_zone_every(ze_zone)) {
-		ui_toast(TR(ZONE_TOAST_HOLDS_EVERY_CHANNEL, "It holds every channel: it stays"));
+		ui_toast(TR(ZONE_TOAST_NOT_IN_ALL_CHANNELS, "Not Available in All Channels Zone"));
 		return;
 	}
 	if (i == ZO_RENAME) {

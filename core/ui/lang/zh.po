@@ -1940,6 +1940,11 @@ msgid "Zone options"
 msgstr "区域选项"
 
 #: core/ui/ui_menus.c
+msgctxt "ZONE_TOAST_NOT_IN_ALL_CHANNELS"
+msgid "Not Available in All Channels Zone"
+msgstr ""
+
+#: core/ui/ui_menus.c
 msgctxt "SHARE_ROW_ZONE_TO"
 msgid "⤒ Share zone to..."
 msgstr "⤒ 共享区域至……"
