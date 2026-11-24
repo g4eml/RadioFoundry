@@ -146,7 +146,8 @@ static void list(void)
 #endif
 	for (uint16_t z = 0; z < 4; z++) {
 		zone_t zn;
-		if (codeplug_zone(z, &zn)) {
+		// the "All channels" zone is the radio's own, never stored: the dump is the stored codeplug
+		if (!codeplug_zone_every(z) && codeplug_zone(z, &zn)) {
 			printf("zone %u \"%s\" %u:", (unsigned)z, zn.name, (unsigned)zn.count);
 			for (uint16_t i = 0; i < zn.count; i++) {
 				printf(" %u", (unsigned)zn.channels[i]);
@@ -194,7 +195,8 @@ static void detail(const uint32_t *ids, unsigned id_count)
 	}
 	for (uint16_t z = 0; z < codeplug_zone_count(); z++) {
 		zone_t zn;
-		if (codeplug_zone(z, &zn)) {
+		// the "All channels" zone is the radio's own, never stored: the dump is the stored codeplug
+		if (!codeplug_zone_every(z) && codeplug_zone(z, &zn)) {
 			printf("zone %u \"%s\":", (unsigned)z, zn.name);
 			for (uint16_t i = 0; i < zn.count; i++) {
 				printf(" %u", (unsigned)zn.channels[i]);
