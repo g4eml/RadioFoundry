@@ -736,12 +736,14 @@ static const flow_t flows[] = {
 #endif
 	{ "12 into the VFO", "", "ok 4 up ok", "vfo=1 screen=home", 4, false },
 	{ "12 446.000 in the VFO", "ok 4 up ok", "4 4 6 0 0 0 ok", "freq=446000000", 7, false },
+#if CONFIG_AM_RX
 	// Air band channel names (docs/spec/airband-and-broadcast.md 3.4): kept and shown as typed, the radio core tunes
 	// the channel; one that names no channel is refused; a 100 Hz digit more is a frequency
 	{ "12 air band name 118.010 in the VFO", "am ok 4 up ok", "1 1 8 0 1 0 ok", "freq=118010000 shows=118.010", 7, false },
 	{ "12 air band name that is no channel", "am ok 4 up ok", "1 1 8 0 2 0 ok",
 	  "entry=118020 toast=No_air_band_channel_by_that_name", 7, false },
 	{ "12 air band frequency to 100 Hz", "am ok 4 up ok", "1 1 8 0 0 5 5 ok", "freq=118005500 shows=118.0055", 8, false },
+#endif
 	{ "12 air band without AM: any kHz", "ok 4 up ok", "1 1 8 0 2 0 ok", "freq=118020000", 7, false },
 	{ "13 lock", "", "long:quick", "locked=1", 1, false },
 	{ "13 unlock", "long:quick", "long:quick", "locked=0", 1, false },
